@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The rule, the counter, the reasoning solver and the shipped pool are all pure ES modules:
+  # no browser and no install step. Three rows are the reason this job exists:
+  #   * count.test.mjs — every hand-derived fixture is re-counted and cross-checked against a
+  #     brute-force 3^slots enumerator that shares no search code, plus all 251 single-clue
+  #     erasures of the shipped pool;
+  #   * model.test.mjs — the four legality constraints and the handshake identity (Σp is even,
+  #     the root target is exactly Σp/2);
+  #   * library.test.mjs — re-counts and re-reasons every row of js/data/lots.js, so a
+  #     hand-edited difficulty number or a stale bake fails the build instead of shipping.
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax
+        run: for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check "$f"; done
+      - name: Suites
+        run: for f in test/*.test.mjs; do echo "::group::$f"; node "$f"; echo "::endgroup::"; done
+
+  # The shell is only proven by driving a real page with real mouse events: the canvas hit
+  # test, the refused-drag rule and the save file all live behind `window.hashi`.
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Headless playtest
+        env:
+          SKIP_UNIT: 1
+          WD_TIMEOUT: 240
+        run: bash tools/verify.sh
