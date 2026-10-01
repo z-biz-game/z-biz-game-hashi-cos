@@ -9,6 +9,7 @@ import {
 } from './core/library.js';
 import { todayKey } from './core/rng.js';
 import { createView } from './view.js';
+import { audio } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -17,6 +18,8 @@ const el = {
   verdict: $('verdict'), tally: $('tally'), undo: $('undo'), hint: $('hint'),
   restart: $('restart'), share: $('share'), next: $('next'), again: $('again'),
   toast: $('toast'), canvas: $('sea'), wipe: $('wipe'),
+  mute: $('mute'), pause: $('pause'), fs: $('fs'), help: $('help'),
+  helpModal: $('help-modal'), helpClose: $('help-close'), pauseVeil: $('pause-veil'),
 };
 
 const LEVELS = ALL.length;
@@ -29,6 +32,8 @@ const app = {
   label: '',
   day: null,
   lastHint: null,
+  paused: false,
+  muted: false,
 };
 
 const REJECT_LINE = {
@@ -182,16 +187,20 @@ function render() {
 // The one place a bridge happens: the drag from the view, the replay from a test, and the
 // hint's own suggestion all arrive here, and all of them go through js/core/game.js.
 function commit(a, b) {
+  if (app.paused || !el.helpModal.hidden) return false; // 暂停 / 玩法浮层期间不吃输入
   const g = app.game;
   const r = dragBridge(g, a, b);
   if (!r.ok) {
     if (r.slot >= 0) view.shakeSlot(r.slot);
+    audio.reject();
     view.redraw();
     renderCrumbs();
     const line = REJECT_LINE[r.reason] || '这一拖不成立';
     say(`<span class="bad">${line}</span>`);
     return false;
   }
+  if (r.action === 'clear') audio.clear();
+  else audio.add();
   renderCrumbs();
   if (g.done) finish();
   else {
@@ -220,6 +229,7 @@ function finish() {
   el.next.hidden = !nextIndex;
   el.curtain.hidden = false;
   view.celebrate();
+  audio.win();
   render();
 }
 
@@ -326,19 +336,128 @@ el.wipe.addEventListener('click', () => {
 
 window.addEventListener('hashchange', apply);
 window.addEventListener('resize', () => view.measure());
+
+// ---- 系统控件：静音 / 暂停 / 全屏 / 玩法 / reduceMotion ----
+// 偏好独立于成绩存档，用一个极小的 key 存，读失败一律退回默认（不抛）。
+const PREFS_KEY = 'hashi.prefs.v1';
+function loadPrefs() {
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && typeof p === 'object') return p;
+    }
+  } catch (err) { /* 无痕/坏档 → 默认 */ }
+  return {};
+}
+function savePrefs(patch) {
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch }));
+  } catch (err) { /* 存不下就算了 */ }
+}
+const prefs = loadPrefs();
+
+function setMuted(v) {
+  app.muted = !!v;
+  audio.setMuted(app.muted); // 静音态下 audio 不再新建振荡器，且挂起上下文
+  if (el.mute) {
+    el.mute.setAttribute('aria-pressed', String(app.muted));
+    el.mute.textContent = app.muted ? '已静音' : '静音';
+  }
+  savePrefs({ muted: app.muted });
+}
+function toggleMute() { setMuted(!app.muted); }
+
+function setPaused(v) {
+  app.paused = !!v;
+  view.setPaused(app.paused); // 暂停期间 rAF 仍在，但仿真不推进
+  if (app.paused) audio.suspend();
+  else audio.resume();
+  if (el.pauseVeil) el.pauseVeil.hidden = !app.paused;
+  if (el.pause) el.pause.setAttribute('aria-pressed', String(app.paused));
+}
+function togglePause() { setPaused(!app.paused); }
+
+function toggleFullscreen() {
+  const node = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (node.requestFullscreen) node.requestFullscreen().catch(() => {});
+    else if (node.webkitRequestFullscreen) node.webkitRequestFullscreen();
+  } else if (document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+function syncFullscreen() {
+  if (el.fs) el.fs.setAttribute('aria-pressed', String(!!document.fullscreenElement));
+}
+
+function openHelp() { if (el.helpModal) el.helpModal.hidden = false; }
+function closeHelp() {
+  if (el.helpModal) el.helpModal.hidden = true;
+  savePrefs({ seenHelp: true });
+  audio.unlock();
+}
+function toggleHelp() {
+  if (el.helpModal && el.helpModal.hidden) openHelp();
+  else closeHelp();
+}
+
+// reduceMotion 真分支：命中就把粒子/涟漪/抖动关掉，标题动效退化为静图。
+const rmq = typeof window.matchMedia === 'function'
+  ? window.matchMedia('(prefers-reduced-motion: reduce)')
+  : null;
+function applyMotion() { view.setMotion(!(rmq && rmq.matches)); }
+if (rmq) {
+  if (rmq.addEventListener) rmq.addEventListener('change', applyMotion);
+  else if (rmq.addListener) rmq.addListener(applyMotion);
+}
+
+if (el.mute) el.mute.addEventListener('click', toggleMute);
+if (el.pause) el.pause.addEventListener('click', togglePause);
+if (el.fs) el.fs.addEventListener('click', toggleFullscreen);
+if (el.help) el.help.addEventListener('click', toggleHelp);
+if (el.helpClose) el.helpClose.addEventListener('click', closeHelp);
+if (el.helpModal) el.helpModal.addEventListener('click', (ev) => { if (ev.target === el.helpModal) closeHelp(); });
+document.addEventListener('fullscreenchange', syncFullscreen);
+
+// 浏览器手势策略：首次交互解锁 AudioContext，之后才允许出声。
+window.addEventListener('pointerdown', () => audio.unlock(), { once: true });
+window.addEventListener('keydown', () => audio.unlock(), { once: true });
+
 window.addEventListener('keydown', (ev) => {
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key.toLowerCase();
-  if (k === 'escape' && !el.curtain.hidden) el.curtain.hidden = true;
+  if (k === '?' || k === 'h') { toggleHelp(); ev.preventDefault(); return; }
+  if (!el.helpModal.hidden) {
+    if (k === 'escape' || k === 'enter' || k === ' ') { closeHelp(); ev.preventDefault(); }
+    return;
+  }
+  if (k === 'escape') {
+    if (app.paused) setPaused(false);
+    else if (!el.curtain.hidden) el.curtain.hidden = true;
+    return;
+  }
+  if (k === 'enter' || k === ' ') {
+    ev.preventDefault();
+    if (!el.curtain.hidden) { if (!el.next.hidden) el.next.click(); else restart(); }
+    else togglePause();
+    return;
+  }
+  if (k === 'p') togglePause();
+  else if (k === 'r') restart();
   else if (k === 'u') el.undo.click();
-  else if (k === 'h') el.hint.click();
-  else if (k === 'r') el.restart.click();
+  else if (k === 'g') el.hint.click();
+  else if (k === 'm') toggleMute();
+  else if (k === 'f') toggleFullscreen();
 });
 
 view.start();
 // Deliberately not paused on visibilitychange: the hint pulse, the refused-drag shake and the win
 // card are driven from the same loop, and a tab that reports itself hidden (headless Chrome does)
 // must still be able to finish a puzzle.
+applyMotion();
+setMuted(!!prefs.muted);
+if (!prefs.seenHelp) openHelp();
 apply();
 
 window.hashi = {
@@ -373,6 +492,11 @@ window.hashi = {
       unlocked: store.unlocked,
       solved: Object.values(store.records).filter((r) => r.solved).length,
       curtain: !el.curtain.hidden,
+      paused: app.paused,
+      muted: app.muted,
+      motion: !(rmq && rmq.matches),
+      help: !el.helpModal.hidden,
+      particles: view.particleCount(),
       grid: view.gridSize(),
     };
   },
@@ -422,4 +546,11 @@ window.hashi = {
   // removed it; hard-coding the string in the rig instead would let a rename in js/core/storage.js
   // pass as "the save file is gone" while the old key was still sitting there.
   saveKey: SAVE_KEY,
+  // 帧率对拍钩子：把同一批确定性粒子分别按 30/60/120Hz 的步长喂进 stepParticles，比较最终态。
+  testSpawn(n) { view.testSpawn(n); return view.particleCount(); },
+  testStep(dt) { view.testStep(dt); return view.particleCount(); },
+  testParticles() { return view.testParticles(); },
+  setPaused(v) { setPaused(v); },
+  setMuted(v) { setMuted(v); },
+  setMotion(v) { view.setMotion(v); },
 };

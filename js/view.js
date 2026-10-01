@@ -42,6 +42,25 @@ export function createView(canvas, { onBridge } = {}) {
   let shake = null; // { slot, until } — a refused drag, drawn as a short wobble
   let raf = 0;
   let last = 0;
+  let motion = true; // prefers-reduced-motion:false → 允许粒子/涟漪/抖动
+  let paused = false;
+  const particles = [];
+
+  // 真位图资产（由 assets/gen/make_art.py 烤出）。加载失败或环境无 Image 时保持 false，
+  // 渲染回落到程序化绘制 —— 资产是增强，不是依赖。
+  const tex = { sea: false, island: false, spark: false };
+  const img = {};
+  function loadTex(key, src, flag) {
+    if (typeof Image === 'undefined') return;
+    const im = new Image();
+    im.onload = () => { tex[flag] = true; draw(); };
+    im.onerror = () => { tex[flag] = false; };
+    im.src = src;
+    img[key] = im;
+  }
+  loadTex('sea', 'assets/sea-tile.png', 'sea');
+  loadTex('island', 'assets/island.png', 'island');
+  loadTex('spark', 'assets/particle.png', 'spark');
 
   function measure() {
     const box = canvas.getBoundingClientRect();
@@ -211,6 +230,21 @@ export function createView(canvas, { onBridge } = {}) {
     g.addColorStop(1, SEA_BOTTOM);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, vw, vh);
+    // 真海纹 tile（assets/sea-tile.png）：加载成功才叠，低透明度盖在渐变上；未加载则纯程序化。
+    if (tex.sea && img.sea) {
+      try {
+        const pat = ctx.createPattern(img.sea, 'repeat');
+        if (pat) {
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = pat;
+          ctx.fillRect(0, 0, vw, vh);
+          ctx.restore();
+        }
+      } catch (err) {
+        /* createPattern 在个别环境对未解码图会抛，忽略即可 */
+      }
+    }
     // swell: a fixed pattern of short arcs, so the sea reads as water and not as a wallpaper
     ctx.strokeStyle = 'rgba(140, 190, 230, 0.10)';
     ctx.lineWidth = 1.5;
@@ -249,7 +283,7 @@ export function createView(canvas, { onBridge } = {}) {
     const width = Math.max(2.5, geom.cell * 0.075);
     const color = wobbling ? WARN : hinted ? HI : BRIDGE;
     const t = wobbling ? (shake.until - now) / 260 : 0;
-    const off = wobbling ? Math.sin(now / 24) * 3 * Math.max(0, t) : 0;
+    const off = wobbling && motion ? Math.sin(now / 24) * 3 * Math.max(0, t) : 0;
     if (n === 1) {
       const e = bridgeEnds(s, 0);
       strokeBridge(e.x1 + off, e.y1, e.x2 + off, e.y2, width, color);
@@ -289,6 +323,15 @@ export function createView(canvas, { onBridge } = {}) {
     ctx.beginPath();
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
     ctx.stroke();
+    // 真岛屿 sprite（assets/island.png）：加载成功就盖在程序化沙盘上，透明留白按半径缩放。
+    if (tex.island && img.island) {
+      try {
+        const box = r * 2.6;
+        ctx.drawImage(img.island, c.x - box / 2, c.y - box / 2, box, box);
+      } catch (err) {
+        /* 图未解码时 drawImage 会抛，忽略，保留程序化沙盘 */
+      }
+    }
 
     // satisfied islands get a ring the colour of the number's own state: met = cyan, over = red
     if (p >= 0 && !game.done) {
@@ -301,12 +344,20 @@ export function createView(canvas, { onBridge } = {}) {
       ctx.stroke();
     }
     if (hint && (hint.a === i || hint.b === i)) {
-      const t = (now % 900) / 900;
-      ctx.strokeStyle = `rgba(120, 220, 255, ${(0.85 - t * 0.55).toFixed(3)})`;
-      ctx.lineWidth = 2 + t * 4;
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, r + 5 + t * 6, 0, Math.PI * 2);
-      ctx.stroke();
+      if (motion) {
+        const t = (now % 900) / 900;
+        ctx.strokeStyle = `rgba(120, 220, 255, ${(0.85 - t * 0.55).toFixed(3)})`;
+        ctx.lineWidth = 2 + t * 4;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r + 5 + t * 6, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = 'rgba(120, 220, 255, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, r + 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
     if (drag && drag.from === i) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
@@ -346,6 +397,65 @@ export function createView(canvas, { onBridge } = {}) {
     ctx.restore();
   }
 
+  // 确定性伪随机：通关粒子的初速度用固定种子的 LCG，而不是 Math.random，
+  // 这样帧率对拍能在 30/60/120Hz 下复现出逐位相同的粒子态。
+  let _seed = 0x9e3779b9;
+  function psrnd() {
+    _seed = (_seed + 0x6d2b79f5) >>> 0;
+    let t = _seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function spawnParticles(n) {
+    if (!motion) return; // reduceMotion：不放粒子
+    const cx = game ? geom.ox + (game.comp.w * geom.cell) / 2 : geom.vw / 2;
+    const cy = game ? geom.oy + (game.comp.h * geom.cell) / 2 : geom.vh / 2;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + psrnd() * 0.35;
+      const sp = 120 + psrnd() * 170;
+      particles.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 70, life: 0.9 + psrnd() * 0.5, max: 1.4 });
+    }
+  }
+
+  // 帧率无关：位移用 x += v*dt，阻尼用 Math.pow(k, dt*60) —— 30/60/120Hz 下同一虚拟时长结果一致。
+  function stepParticles(dt) {
+    const G = 520;
+    const damp = Math.pow(0.92, dt * 60);
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += G * dt;
+      p.vx *= damp;
+      p.vy *= damp;
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawParticles() {
+    if (!particles.length) return;
+    ctx.save();
+    for (const p of particles) {
+      const a = Math.max(0, Math.min(1, p.life / p.max));
+      if (tex.spark && img.spark) {
+        const s = 10 + 8 * a;
+        ctx.globalAlpha = a;
+        ctx.drawImage(img.spark, p.x - s / 2, p.y - s / 2, s, s);
+      } else {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = HI;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2 + 2 * a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
   function draw() {
     if (!game) {
       drawSea();
@@ -357,16 +467,23 @@ export function createView(canvas, { onBridge } = {}) {
     for (const s of game.comp.slots) drawBridge(s, now);
     for (let i = 0; i < game.comp.n; i++) drawIsland(i, now);
     drawPreview();
+    drawParticles();
   }
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(64, now - (last || now));
+    if (paused) {
+      last = now; // 暂停：只对齐时钟，仿真（粒子/涟漪/抖动计时）一律不推进
+      return 0;
+    }
+    const dtms = Math.min(64, now - (last || now));
     last = now;
+    const dt = Math.min(0.05, dtms / 1000);
     if (hint && now >= hint.until) hint = null;
     if (shake && now >= shake.until) shake = null;
-    if (drag || hint || shake) draw();
-    return dt;
+    if (particles.length) stepParticles(dt);
+    if (drag || hint || shake || particles.length) draw();
+    return dtms;
   }
 
   canvas.addEventListener('pointerdown', down);
@@ -380,6 +497,7 @@ export function createView(canvas, { onBridge } = {}) {
       drag = null;
       hint = null;
       shake = null;
+      particles.length = 0;
       measure();
     },
     measure,
@@ -408,8 +526,25 @@ export function createView(canvas, { onBridge } = {}) {
     celebrate() {
       hint = null;
       shake = null;
+      spawnParticles(28);
       draw();
     },
+    setPaused(v) {
+      paused = !!v;
+      if (!paused) last = 0; // 恢复后不补算暂停期间的时长
+    },
+    isPaused() { return paused; },
+    setMotion(v) {
+      motion = !!v;
+      if (!motion) particles.length = 0;
+      draw();
+    },
+    particleCount() { return particles.length; },
+    // 帧率对拍用的确定性钩子：同一批粒子分别按 30/60/120Hz 的步长喂 stepParticles，
+    // 比较最终位置是否一致（dt 无关性）。
+    testSpawn(n) { spawnParticles(n); },
+    testStep(dt) { stepParticles(dt); },
+    testParticles() { return particles.map((p) => ({ x: p.x, y: p.y, life: p.life })); },
     start() {
       if (!raf) {
         last = 0;

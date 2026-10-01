@@ -57,6 +57,12 @@
       <button type="button" id="restart">重开</button>
       <button type="button" id="share">分享</button>
     </div>
+    <div class="controls sys">
+      <button type="button" id="mute" aria-pressed="false">静音</button>
+      <button type="button" id="pause" aria-pressed="false">暂停</button>
+      <button type="button" id="fs" aria-pressed="false">全屏</button>
+      <button type="button" id="help">玩法</button>
+    </div>
     <div class="shelf" id="shelf"></div>
     <details class="about">
       <summary>这一关的数字从哪来</summary>
@@ -67,7 +73,22 @@
   </aside>
 </main>
 
+<div class="modal" id="help-modal" hidden role="dialog" aria-modal="true" aria-label="玩法说明">
+  <div class="modal-card">
+    <h2>怎么玩</h2>
+    <ol>
+      <li>从一座岛<b>拖</b>到同排或同列的另一座岛：第一次架 <b>1</b> 根，再拖加到 <b>2</b> 根，第三次拆光（0→1→2→0）。</li>
+      <li>每座岛周围的桥数要<b>正好等于</b>它的数字；桥不能交叉。</li>
+      <li>所有数字都满足、且岛屿<b>连成一片</b>，这一局就解开了。</li>
+    </ol>
+    <p class="keys">键盘：Enter/Space 开始·暂停 · R 重开 · U 撤销 · G 提示 · M 静音 · F 全屏 · H/? 玩法</p>
+    <div class="modal-actions"><button type="button" id="help-close" class="primary">开始游戏</button></div>
+  </div>
+</div>
+<div class="veil" id="pause-veil" hidden><p>已暂停</p></div>
+
 <p class="toast" id="toast" hidden></p>
 <script type="module" src="js/main.js"></script>
+<script src="sw-register.js"></script>
 </body>
 </html>
