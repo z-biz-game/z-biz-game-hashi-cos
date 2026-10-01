@@ -19,6 +19,13 @@ function blank() {
 
 let cache = null;
 
+// 数值字段强制成有限非负整数：坏档里的 null / "x" / NaN / 负数 / 越界都退回 0，
+// 不让一个坏值把整块统计污染成 NaN（两段式解码的第二段：逐字段，而不是整块信任）。
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+}
+
 function load() {
   if (cache) return cache;
   let raw = null;
@@ -32,11 +39,17 @@ function load() {
       const p = JSON.parse(raw);
       if (p && typeof p === 'object') {
         const base = blank();
+        const st = p.stats && typeof p.stats === 'object' ? p.stats : {};
         cache = {
           records: p.records && typeof p.records === 'object' ? p.records : base.records,
           daily: p.daily && typeof p.daily === 'object' ? p.daily : base.daily,
-          unlocked: Number(p.unlocked) > 0 ? Number(p.unlocked) : base.unlocked,
-          stats: { ...base.stats, ...(p.stats || {}) },
+          unlocked: num(p.unlocked) >= 1 ? num(p.unlocked) : base.unlocked,
+          stats: {
+            solves: num(st.solves),
+            perfect: num(st.perfect),
+            drags: num(st.drags),
+            hints: num(st.hints),
+          },
         };
         return cache;
       }
@@ -63,7 +76,10 @@ export const store = {
   get unlocked() { return load().unlocked; },
 
   record(id) {
-    return load().records[id] || null;
+    const r = load().records[id];
+    // 两段式解码的第二段：单条坏记录（null/数字/字符串/数组）只丢它自己，返回 null，
+    // 不让 UI 去 `rec.best` 解引用一个非对象而把整局冻死。
+    return r && typeof r === 'object' && !Array.isArray(r) ? r : null;
   },
 
   // Unlocking is monotone: replaying an early island chain must never hide a later one.

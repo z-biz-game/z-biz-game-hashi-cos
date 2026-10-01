@@ -119,8 +119,9 @@ function renderCrumbs() {
 
 function renderTotals() {
   const s = store.stats;
-  el.totals.innerHTML = `已通 <b>${Object.values(store.records).filter((r) => r.solved).length}</b>/${LEVELS}`
-    + ` · 一次到位 <b>${Object.values(store.records).filter((r) => r.perfect).length}</b>`
+  const recs = Object.values(store.records).filter((r) => r && typeof r === 'object');
+  el.totals.innerHTML = `已通 <b>${recs.filter((r) => r.solved).length}</b>/${LEVELS}`
+    + ` · 一次到位 <b>${recs.filter((r) => r.perfect).length}</b>`
     + ` · 提示 <b>${s.hints}</b>`;
 }
 
@@ -490,7 +491,7 @@ window.hashi = {
       done: !!(g && won(g)),
       flag: !!(g && g.done),
       unlocked: store.unlocked,
-      solved: Object.values(store.records).filter((r) => r.solved).length,
+      solved: Object.values(store.records).filter((r) => r && typeof r === 'object' && r.solved).length,
       curtain: !el.curtain.hidden,
       paused: app.paused,
       muted: app.muted,
