@@ -87,6 +87,23 @@ canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不
 不带 token 的裸 `#/random/shoal` 会被 `location.replace` 补一个，否则同一个链接每次打开都换题，
 "分享"就成了假话。
 
+## 六道闸
+
+每个印出来的数字都得有人守着，闸本身的大小也得钉住 —— 缩水的闸不是闸。
+
+| 闸 | 命令 | 它钉住什么 |
+| --- | --- | --- |
+| 引擎/逻辑 | `node test/<name>.test.mjs`（7 个文件） | 规则、计数器、深度、出厂题库的每一行 |
+| balance | `node test/balance.mjs` | `DESIGN.md` §5 那张表的七个结构列逐位可复现 |
+| doctest（文档数字闸） | `node tools/doctest.mjs` | 文档里每一个能现算的数：17 组 / 254 项等式，代码是基准 |
+| sabotage（破坏试验台账） | `node tools/sabotage.mjs` | 破坏试验台账（5 把刀）：每把打一组断言，逼红并点名它杀掉了哪一条 |
+| playtest | `bash tools/verify.sh` | 真实 headless Chrome + 裸 CDP 的五段浏览器断言（`@boot @play @routes @save @pointer`） |
+| CI | `.github/workflows/ci.yml` | 前四道在不开浏览器的 job 里跑，浏览器单独一个 job |
+
+`bash tools/verify.sh` 会把两道文档闸跑在起浏览器**之前**，并把它们的 rc 与自己的规模钉
+（`DOCTEST_ROWS_EXPECT` / `SABOTAGE_KNIVES_EXPECT`）一起折进结论；`ONLY=D5 node tools/doctest.mjs`
+这类子集运行会逐组打 `NOTE`，不会静默跳过。
+
 ## 已知边界（诚实清单）
 
 * **`k` 只在本仓内可比**。它定义在"本仓这 7 条规则 + 这个分支顺序 + 不用连通性做推理"之上；

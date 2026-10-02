@@ -30,6 +30,14 @@ jobs:
         run: for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check "$f"; done
       - name: Suites
         run: for f in test/*.test.mjs; do echo "::group::$f"; node "$f"; echo "::endgroup::"; done
+      # Two documentation-honesty gates, both pure logic (no browser): doctest re-derives every
+      # number README/DESIGN prints from the engine or from balance and asserts equality; sabotage
+      # then breaks one file at a time to prove each assertion group really goes RED and names the
+      # assertion it killed. Their size is pinned inside the gates and again in tools/verify.sh.
+      - name: Doctest (文档数字闸)
+        run: node tools/doctest.mjs
+      - name: Sabotage (破坏试验台账)
+        run: node tools/sabotage.mjs
 
   # The shell is only proven by driving a real page with real mouse events: the canvas hit
   # test, the refused-drag rule and the save file all live behind `window.hashi`.

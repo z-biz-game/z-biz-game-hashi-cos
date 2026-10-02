@@ -35,6 +35,32 @@ if [ -z "${SKIP_UNIT:-}" ]; then
     echo "--- $f"
     node "$f" || FAILED=1
   done
+  # ------------------------------------------------------------------ documentation honesty gates
+  # doctest re-derives every number README/DESIGN prints from the engine or from this repo's own
+  # tools (a lying doc goes RED, and the doc gets fixed — never the assertion); sabotage then
+  # breaks one file at a time and proves each assertion group really does go RED and names the
+  # assertion it killed. Both are pure logic runs, so they belong here, before any browser exists.
+  # Their *own size* is pinned below as well as inside the gate: rc=0 alone cannot detect a gate
+  # that was narrowed by deleting 20 assertions, so a mismatched row/knife count is a failure too.
+  GATES="doctest sabotage"
+  DOCTEST_GROUPS_EXPECT=${DOCTEST_GROUPS_EXPECT:-17}
+  DOCTEST_ROWS_EXPECT=${DOCTEST_ROWS_EXPECT:-254}
+  SABOTAGE_KNIVES_EXPECT=${SABOTAGE_KNIVES_EXPECT:-5}
+  for g in $GATES; do
+    echo "=== $g ==="
+    OUT=$(node "tools/$g.mjs" 2>&1); RC=$?
+    printf '%s\n' "$OUT"
+    case "$g" in
+      doctest) PIN_WANT="pin: groups=$DOCTEST_GROUPS_EXPECT rows=$DOCTEST_ROWS_EXPECT" ;;
+      sabotage) PIN_WANT="pin: knives=$SABOTAGE_KNIVES_EXPECT" ;;
+    esac
+    PIN_GOT=$(printf '%s\n' "$OUT" | grep '^pin: ' | head -1)
+    if [ "$PIN_GOT" != "$PIN_WANT" ]; then
+      echo "$g 的规模与 verify.sh 的钉不符：got [$PIN_GOT] want [$PIN_WANT]" >&2
+      FAILED=1
+    fi
+    if [ $RC -ne 0 ]; then echo "$g rc=$RC（红）" >&2; FAILED=1; fi
+  done
   if [ $FAILED -ne 0 ]; then
     echo "=== node suites failed; browser not started ===" >&2
     exit $FAILED
