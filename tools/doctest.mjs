@@ -137,7 +137,9 @@ const fixSection = DESIGN.slice(DESIGN.indexOf('| fixture | 盘 |'), DESIGN.inde
 const fixRows = [...fixSection.matchAll(/^\| `([A-Z_]+)` \| ([^|]+) \| ([^|]+) \|/gm)];
 ok(fixRows.length === 4, `D3a DESIGN §3 的 fixture 表解析到 4 行（每行一个手工盘；解析不到就是表格形状改了）`,
   `${fixRows.length} 行：${fixRows.map((r) => r[1]).join('/')}`);
-const vecOf = (comp, sol) => comp.slots.map((s) => sol[s.i] ?? 0);
+// 解向量的格式化。sol 可能是 undefined（fixture 被改坏到无解时，上面那些 ok 的 detail 会先算参数）：
+// 这里给一个占位而不是抛异常 —— 无解本身就是那一条要红的理由，闸不许在印判决之前先崩掉。
+const vecOf = (comp, sol) => comp.slots.map((s) => (sol ? sol[s.i] ?? 0 : '—'));
 const asSorted = (list) => list.map((v) => v.join(',')).sort().join(' ; ');
 // 方括号里那份数字列：空白与逗号种类是排版而不是数值，抓出来归一化后再比
 const bracket = (str, kw) => { const m = str.match(new RegExp(kw + '[\\s\\S]{0,10}?\\[([\\d\\s\uff0c,]+)\\]')); return m ? m[1].replace(/\s+/g, '').replace(/\uff0c/g, ',') : null; };
@@ -528,8 +530,11 @@ ok(!!knifeDoc && +knifeDoc === knifeIds.length, `D16b README 那句「台账（N
 const rcCells = knifeIds.map((id) => (sabSrc.match(new RegExp(`id: '${id}'[\\s\\S]*?rc: '(\\d+|\\?)'`)) || [])[1]);
 ok(rcCells.every((x) => x && /^\d+$/.test(x)), `D16c 台账每一格 rc 都是从闸里读回来的数字（'?' 表示这一版还没整跑过）`, rcCells.join(' / '));
 const knifeGroups = [...sabSrc.matchAll(/id: 'K\d+', group: '(D\d+)'/g)].map((m) => m[1]);
-ok(new Set(knifeGroups).size === knifeGroups.length && knifeGroups.every((g) => emitted.has(g)),
-  `D16d 每把刀打的都是不同的断言组，而且那些组本闸真的发过`, `${knifeGroups.join(' ')} vs 本闸 ${[...emitted].length} 组`);
+// D17 是本闸最后一组：跑到这里它自己那两条还没发，所以它只能被"钉表改了而刀没跟上"这类红抓住。
+// 除它以外，刀口点名的组必须此刻真的发过，否则那把刀在冒充一组并不存在的断言。
+ok(new Set(knifeGroups).size === knifeGroups.length && knifeGroups.every((g) => emitted.has(g) || g === 'D17'),
+  `D16d 每把刀打的都是不同的断言组，而且那些组本闸真的发过（D17 是本闸最后一组，它的证据在 D17 自己那两条）`,
+  `${knifeGroups.join(' ')} vs 本闸 ${[...emitted].length} 组`);
 
 // ---- D17 自数：这道闸自己发出的组数与项数都钉死 —— 删一条断言/少解析一行就是这里红 ----
 const EXPECT_GROUPS = 17;

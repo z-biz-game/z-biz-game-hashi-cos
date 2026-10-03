@@ -21,9 +21,15 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const p = (rel) => join(ROOT, rel);
 
-// 五把刀，各打 doctest 的一个不同组：D1 档位岛数区间、D2 规则原文、D5 balance 实测表、
-// D8 端口默认号、D9 屏上读数的名字。全部是纯逻辑的常量改动 —— 不动浏览器、不开 Chrome，
-// 因此这把刀在任何机器上都一样快、一样准。
+// 十六把刀，doctest 的十七个组里一组一把：D1 档位岛数区间、D2 规则原文、D3 手工 fixture、
+// D4 上限三件套与 bake 默认值、D5 balance 实测表、D6 变体数抄表、D7 示例卡、D8 端口默认号、
+// D9 屏上读数的名字、D10 符号锚点行号、D12 七套测试的条数、D13 npm 接线、D14「别引用毫秒」的
+// 代码背书、D15 unpinned 的 needle、D16 台账自己、D17 本闸项数。全部是纯逻辑改动 —— 不动浏览器、
+// 不开 Chrome，每把刀跑一趟整闸（本仓 doctest 1s 跑完 254 项，所以没必要也没有子集）。
+// **D11 没有刀**：那一组钉的是"文档每条 path:NN 都落在真实行数内"，而最紧的一条引用（model.js:338）
+// 距离文件末尾还有 58 行 —— 要红它只能整段删掉 58 行真代码，或者把被引用的文件改名（闸会直接
+// 抛 ENOENT、连 FAIL 都印不出来）。两种都不是"最小扰动"，所以这一组宁可空着并在文档里写明，
+// 也不塞一把打不中要害的刀来充数。
 const KNIVES = [
   {
     id: 'K1', group: 'D1', file: 'js/data/lots.js',
@@ -58,6 +64,96 @@ const KNIVES = [
     from: "field('推理深度', app.lot.k,", to: "field('深度k', app.lot.k,",
     breaks: '把侧栏第四个读数的名字改掉（README「屏上的四个数」表里那一行写的是 推理深度）',
     assert: /FAIL D9 文档表的四个名字与页面头四个读数逐条同序/,
+    rc: '1',
+  },
+  {
+    id: 'K6', group: 'D3', file: 'test/fixture.mjs',
+    from: "export const SQUARE_A = {\n  w: 3,\n  h: 3,\n  islands: [\n    { r: 0, c: 0, p: 2 },",
+    to: "export const SQUARE_A = {\n  w: 3,\n  h: 3,\n  islands: [\n    { r: 0, c: 0, p: 3 },",
+    breaks: '把 SQUARE_A 第一座岛的 p 从 2 改成 3（这份手工盘是人在纸上算过的，动一个数就等于改了那份纸）——DESIGN §3 表里那一行的 p 数组与计数器现量当场分家',
+    assert: /FAIL D3 SQUARE_A 的 p=/,
+    rc: '1',
+  },
+  {
+    id: 'K7', group: 'D4', file: 'tools/bake.mjs',
+    from: 'const PER_TIER = Number(process.env.PER_TIER || 8);',
+    to: 'const PER_TIER = Number(process.env.PER_TIER || 9);',
+    breaks: '把 bake 的默认每档种子数 8 改成 9（README 的 SEED_LIMIT = PER_TIER × 60、DESIGN 的「= 480」都是按 8 抄的）——出厂流程的默认值一改，文档那两格立刻要红',
+    assert: /FAIL D4h bake 的 PER_TIER 默认/,
+    rc: '1',
+  },
+  {
+    id: 'K8', group: 'D6', file: 'tools/doctest.mjs',
+    from: 'const tierIsl = { shoal: 33,',
+    to: 'const tierIsl = { shoal: 34,',
+    breaks: '把本闸自己那份"每档擦线索变体数"抄表改一个数（shoal 33 → 34）——现扫的 sweep 与它逐档相加那一刻必须红，抄表不是免检的',
+    assert: /FAIL D6i 四档变体数逐档现量相加/,
+    rc: '1',
+  },
+  {
+    id: 'K9', group: 'D7', file: 'js/data/lots.js',
+    from: '"solution":[1,1,1],"id":"shoal-01"',
+    to: '"solution":[2,1,1],"id":"shoal-01"',
+    breaks: '把第一关的解里第一格从 1 根改成 2 根（盘和线索都没动，动的是那条"官方解答"）——README 示例卡那句「度数 … 全部对上」的 checkBridges 现算当场不认',
+    assert: /FAIL D7 示例卡「度数 /,
+    rc: '1',
+  },
+  {
+    id: 'K10', group: 'D10', file: 'js/core/make.js',
+    from: '// A random scatter with a uniqueness filter afterwards does not work either: most scatters',
+    to: '// 台账探针：只把下面那段论证往下推一行，它的字一个字没动。\n// A random scatter with a uniqueness filter afterwards does not work either: most scatters',
+    breaks: '在 make.js 那段"随机撒岛为什么不行"的论证头上插一行注释（语义一字未变，只有行号漂）——文档那句 `make.js:15` 就压到隔壁行上了',
+    assert: /FAIL D10 文档为 js\/core\/make\.js 写的/,
+    rc: '1',
+  },
+  {
+    id: 'K11', group: 'D12', file: 'test/rng.test.mjs',
+    from: 'run();', to: "test('台账探针：这套多出一行', () => { ok(true, 'probe'); });\n\nrun();",
+    breaks: '给 rng 那套测试多挂一条 test（rows 数的就是 test 的个数，七套里任何一套多一条，文档抄的那排条数就少 1）——D12 现场跑的 rows 与文档逐位对账当场分家',
+    assert: /FAIL D12c 文档那七个数字逐位等于现场跑的/,
+    rc: '1',
+  },
+  {
+    id: 'K12', group: 'D13', file: 'package.json',
+    from: '"doctest": "node tools/doctest.mjs",',
+    to: '"doctest-legacy": "node tools/doctest.mjs",',
+    breaks: '把 npm script 的名字改掉（JSON 仍可解析、命令仍指向同一个文件）——README 与 CI 承诺的 `npm run doctest` 当场断线，接线组必须红',
+    assert: /FAIL D13a package.json 有 doctest 与 sabotage 两条 script/,
+    rc: '1',
+  },
+  {
+    id: 'K13', group: 'D14', file: 'test/balance.mjs',
+    from: 'msPerSeed: SEEDS ? Number(nsTotal) / 1e6 / SEEDS : NaN,',
+    to: 'msPerSeed: SEEDS ? Number(nsTotal) / 1e6 / SEEDS : NaN, // 台账探针：budgetMs 出现在这里就等于 balance 有了毫秒预算',
+    breaks: '在 balance 的报表行尾加一句带 budgetMs 的注释——文档那句「别引用毫秒」的代码背书（balance 里没有毫秒预算判定）当场失效',
+    assert: /FAIL D14b balance\.mjs 打印 ms 但没有任何 budgetMs 判定路径/,
+    rc: '1',
+  },
+  {
+    id: 'K14', group: 'D15', file: 'tools/doctest.mjs',
+    from: "['U1', '§5 表里的毫秒两列（0.6 / 3.1 … 6.2 / 7.9）', /0\\.6\\s+3\\.1/],",
+    to: "['U1', '§5 表里的毫秒两列（0.6 / 3.1 … 6.2 / 7.9）', /0\\.6\\s+3\\.9/],",
+    breaks: '把 UNPINNED 清单里 U1 那一条的 needle 改一个数字（3.1 → 3.9）——钉不住的读数仍然要求"还写在文档里"，这一改让那条"要求它还在"的断言先红',
+    assert: /FAIL D15 U1「/,
+    rc: '1',
+  },
+  {
+    id: 'K15', group: 'D16', file: 'tools/sabotage.mjs',
+    // 这把刀的目标就是台账自己，所以两处都要绕开：needle 不能抄成整行刀头（本闸数刀数是拿正则
+    // 在源码文本上扫的，抄整行会被扫成多出来的一把刀）；也不能写成一条完整的字面量（那它在文件
+    // 里就有两份——K5 的真那一行 + 这里的 needle——前置的"恰好命中一次"直接拒刀）。拼起来写，
+    // 磁盘上任何一处都凑不出这一串，运行时算出来的仍然是 K5 那一行。
+    from: "'D9', file: " + "'js/main.js',", to: "'D8', file: " + "'js/main.js',",
+    breaks: '把台账里 K5 那一格点的组名改成 D8（于是两把刀挤在同一组、D9 那一组没人守了）——台账自己的规矩 1 必须由闸点名，而不是由末行印一句「互不相同」',
+    assert: /FAIL D16d 每把刀打的都是不同的断言组/,
+    rc: '1',
+  },
+  {
+    id: 'K16', group: 'D17', file: 'tools/doctest.mjs',
+    from: 'const EXPECT_ROWS = 254;',
+    to: 'const EXPECT_ROWS = 253;',
+    breaks: '把本闸钉死的项目数从 254 改成 253（少钉一项就等于允许将来少发一项）——自钉组必须当场红，并说出它钉的是多少、这次发了多少',
+    assert: /FAIL D17b 本闸项数/,
     rc: '1',
   },
 ];

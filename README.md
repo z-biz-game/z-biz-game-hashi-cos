@@ -96,7 +96,7 @@ canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不
 | 引擎/逻辑 | `node test/<name>.test.mjs`（7 个文件） | 规则、计数器、深度、出厂题库的每一行 |
 | balance | `node test/balance.mjs` | `DESIGN.md` §5 那张表的七个结构列逐位可复现 |
 | doctest（文档数字闸） | `node tools/doctest.mjs` | 文档里每一个能现算的数：17 组 / 254 项等式，代码是基准 |
-| sabotage（破坏试验台账） | `node tools/sabotage.mjs` | 破坏试验台账（5 把刀）：每把打一组断言，逼红并点名它杀掉了哪一条 |
+| sabotage（破坏试验台账） | `node tools/sabotage.mjs` | 破坏试验台账（16 把刀）：doctest 的十七个组一组一把（D11 那一组给不出最小刀，理由写在台账的文件头），每把打一组断言，逼红并点名它杀掉了哪一条 |
 | playtest | `bash tools/verify.sh` | 真实 headless Chrome + 裸 CDP 的五段浏览器断言（`@boot @play @routes @save @pointer`） |
 | CI | `.github/workflows/ci.yml` | 前四道在不开浏览器的 job 里跑，浏览器单独一个 job |
 

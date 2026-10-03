@@ -45,7 +45,7 @@ if [ -z "${SKIP_UNIT:-}" ]; then
   GATES="doctest sabotage"
   DOCTEST_GROUPS_EXPECT=${DOCTEST_GROUPS_EXPECT:-17}
   DOCTEST_ROWS_EXPECT=${DOCTEST_ROWS_EXPECT:-254}
-  SABOTAGE_KNIVES_EXPECT=${SABOTAGE_KNIVES_EXPECT:-5}
+  SABOTAGE_KNIVES_EXPECT=${SABOTAGE_KNIVES_EXPECT:-16}
   for g in $GATES; do
     echo "=== $g ==="
     OUT=$(node "tools/$g.mjs" 2>&1); RC=$?
