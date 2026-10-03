@@ -15,7 +15,9 @@
     "doctest": "node tools/doctest.mjs",
     "sabotage": "node tools/sabotage.mjs",
     "test": "npm run check && npm run unit",
-    "verify": "bash tools/verify.sh"
+    "verify": "bash tools/verify.sh",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
   },
   "keywords": [
     "game",
@@ -33,8 +35,14 @@
   "build": {
     "appId": "com.zbiz.hashi",
     "productName": "Hashi",
-    "mac": { "category": "public.app-category.puzzle-games" },
-    "win": { "target": "nsis" },
-    "linux": { "target": "AppImage" }
+    "mac": {
+      "category": "public.app-category.puzzle-games"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
   }
 }
