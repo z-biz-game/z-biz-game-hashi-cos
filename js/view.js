@@ -43,6 +43,13 @@ export function createView(canvas, { onBridge } = {}) {
   let raf = 0;
   let last = 0;
 
+  // ---- 减弱动效（prefers-reduced-motion）----
+  // 被拒的一拖会左右摆：off = Math.sin(now / 24) * 3 * 衰减，是一段纯装饰的来回位移。
+  // 减弱动效下**只把位移钉成 0，不动颜色**：那座桥此时正画成 WARN 橙，而 WARN 橙是
+  // "刚才这一拖不成立"唯一的画面证据；连它一起关掉，玩家就只剩一句读数，棋盘上却毫无异样。
+  // 与 ferry-cos 同口径：晃动是装饰，告警色是反馈。
+  let reduceMotion = false;
+
   function measure() {
     const box = canvas.getBoundingClientRect();
     const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
@@ -249,7 +256,7 @@ export function createView(canvas, { onBridge } = {}) {
     const width = Math.max(2.5, geom.cell * 0.075);
     const color = wobbling ? WARN : hinted ? HI : BRIDGE;
     const t = wobbling ? (shake.until - now) / 260 : 0;
-    const off = wobbling ? Math.sin(now / 24) * 3 * Math.max(0, t) : 0;
+    const off = wobbling && !reduceMotion ? Math.sin(now / 24) * 3 * Math.max(0, t) : 0;
     if (n === 1) {
       const e = bridgeEnds(s, 0);
       strokeBridge(e.x1 + off, e.y1, e.x2 + off, e.y2, width, color);
@@ -375,6 +382,16 @@ export function createView(canvas, { onBridge } = {}) {
   canvas.addEventListener('pointercancel', up);
 
   return {
+    // The gate the runtime pref flip lands on: idempotent, and repaints so the bridge stops
+    // mid-wobble on the same frame the setting changes rather than at the end of the shake.
+    setReduceMotion(v) {
+      const on = !!v;
+      if (on === reduceMotion) return reduceMotion;
+      reduceMotion = on;
+      if (reduceMotion) draw();
+      return reduceMotion;
+    },
+    isReducedMotion: () => reduceMotion,
     attach(next) {
       game = next;
       drag = null;
