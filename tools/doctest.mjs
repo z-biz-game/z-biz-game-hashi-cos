@@ -522,14 +522,17 @@ ok(!/@boot 19/.test(BAL.out) && !/playtest/.test(BAL_SRC), 'D15b 浏览器那 84
 
 // ---- D16 台账本身：文档说的刀数 == sabotage.mjs 里的 KNIVES 条数，每格 rc 是读回来的数字 ----
 const sabSrc = existsSync(join(ROOT, 'tools/sabotage.mjs')) ? read('tools/sabotage.mjs') : '';
-const knifeIds = [...sabSrc.matchAll(/id: '(K\d+)'/g)].map((m) => m[1]);
+// 三处解析一律行首锚定（照 z-biz-game-masyu-cos 的 D16a 走）：刀自己的 from/to、以及任何一句
+// 讲刀头的注释，磁盘上都可能原样出现一行 `id: 'K5', group: 'D9', ...`。不锚定的话它会被数成
+// 多出来的一把刀 —— 而多出来的那一把没有真刀守着，D16b/D16d 就是在给一个幽灵记账。
+const knifeIds = [...sabSrc.matchAll(/^    id: '(K\d+)'/gm)].map((m) => m[1]);
 ok(knifeIds.length >= 4, `D16a sabotage.mjs 里至少 4 把刀（当前 ${knifeIds.length} 把：${knifeIds.join(' ')}）`, `${knifeIds.length} 把：${knifeIds.join(' ')}`);
 const knifeDoc = (README.match(/破坏试验台账（(\d+) 把刀）/) || [])[1];
 ok(!!knifeDoc && +knifeDoc === knifeIds.length, `D16b README 那句「台账（N 把刀）」等于 sabotage.mjs 里的刀数`,
   `文档 ${knifeDoc ?? '未解析'} vs 脚本 ${knifeIds.length}`);
-const rcCells = knifeIds.map((id) => (sabSrc.match(new RegExp(`id: '${id}'[\\s\\S]*?rc: '(\\d+|\\?)'`)) || [])[1]);
+const rcCells = knifeIds.map((id) => (sabSrc.match(new RegExp(`^    id: '${id}',[\\s\\S]*?rc: '(\\d+|\\?)'`, 'm')) || [])[1]);
 ok(rcCells.every((x) => x && /^\d+$/.test(x)), `D16c 台账每一格 rc 都是从闸里读回来的数字（'?' 表示这一版还没整跑过）`, rcCells.join(' / '));
-const knifeGroups = [...sabSrc.matchAll(/id: 'K\d+', group: '(D\d+)'/g)].map((m) => m[1]);
+const knifeGroups = [...sabSrc.matchAll(/^    id: 'K\d+', group: '(D\d+)'/gm)].map((m) => m[1]);
 // D17 是本闸最后一组：跑到这里它自己那两条还没发，所以它只能被"钉表改了而刀没跟上"这类红抓住。
 // 除它以外，刀口点名的组必须此刻真的发过，否则那把刀在冒充一组并不存在的断言。
 ok(new Set(knifeGroups).size === knifeGroups.length && knifeGroups.every((g) => emitted.has(g) || g === 'D17'),
