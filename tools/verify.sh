@@ -59,7 +59,7 @@ if [ -z "${SKIP_UNIT:-}" ]; then
       echo "$g 的规模与 verify.sh 的钉不符：got [$PIN_GOT] want [$PIN_WANT]" >&2
       FAILED=1
     fi
-    if [ $RC -ne 0 ]; then echo "$g rc=$RC（红）" >&2; FAILED=1; fi
+    if [ $RC -ne 0 ]; then echo "$g rc=${RC}（红）" >&2; FAILED=1; fi
   done
   if [ $FAILED -ne 0 ]; then
     echo "=== node suites failed; browser not started ===" >&2
