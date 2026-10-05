@@ -127,7 +127,7 @@ function renderTotals() {
 
 function renderShelf() {
   if (app.mode === 'campaign') {
-    const unlocked = store.unlocked;
+    const unlocked = clampIndex(store.unlocked);   // 坏档的解锁指针不能把整排关卡点亮
     let html = '';
     for (const tier of TIERS) {
       html += `<p class="tier">${tier.label} · ${tier.blurb}</p>`;
@@ -495,7 +495,10 @@ window.hashi = {
       curtain: !el.curtain.hidden,
       paused: app.paused,
       muted: app.muted,
-      motion: !(rmq && rmq.matches),
+      // 生效标志与媒体查询是两件事：setMotion(false) 之后 motion 必须报 false，
+      // 否则 reduceMotion 分支无法被外部复验（读数会说谎）。
+      motion: view.isMotion(),
+      reduceMotion: !!(rmq && rmq.matches),
       help: !el.helpModal.hidden,
       particles: view.particleCount(),
       // 定步长仿真的读数：帧率对拍要按步号对齐，而不是按墙钟虚拟秒（1000/60 的浮点亏损会少喂 5e-13 秒）。

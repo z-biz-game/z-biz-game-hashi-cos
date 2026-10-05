@@ -568,6 +568,7 @@ export function createView(canvas, { onBridge } = {}) {
       if (!paused) last = performance.now();
     },
     isPaused() { return paused; },
+    isMotion() { return motion; },
     setMotion(v) {
       motion = !!v;
       if (!motion) particles.length = 0;

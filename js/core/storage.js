@@ -21,9 +21,25 @@ let cache = null;
 
 // 数值字段强制成有限非负整数：坏档里的 null / "x" / NaN / 负数 / 越界都退回 0，
 // 不让一个坏值把整块统计污染成 NaN（两段式解码的第二段：逐字段，而不是整块信任）。
-function num(v) {
+// 上限是"越界"的另一半：1e99 确实有限且非负，但一个写着 1e99 次通关的存档不是成绩而是损坏，
+// 收下它等于让一个坏值决定 UI 上打印的数字。
+const MAX_COUNT = 1e6;
+function num(v, max = MAX_COUNT) {
   const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
+  if (!Number.isFinite(n) || n < 0) return 0;
+  const i = Math.floor(n);
+  return i <= max ? i : 0;
+}
+
+// 记录级两段式解码：整条不是对象 ⇒ 只丢它自己（返回 null）；是对象但数值字段坏 ⇒ 逐字段重建，
+// 坏 `best`/`plays` 退回默认而不是原样交给面板打印，也不让脏值卡在 solve() 的"只降不升"比较里。
+// 干净的记录原样交回（连引用一起）：读的人不该拿到存档里从未被写过的键。
+function tidy(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  const best = 'best' in r ? num(r.best) : r.best;
+  const plays = 'plays' in r ? num(r.plays) : r.plays;
+  if (best === r.best && plays === r.plays) return r;
+  return { ...r, best, plays };
 }
 
 function load() {
@@ -76,10 +92,9 @@ export const store = {
   get unlocked() { return load().unlocked; },
 
   record(id) {
-    const r = load().records[id];
     // 两段式解码的第二段：单条坏记录（null/数字/字符串/数组）只丢它自己，返回 null，
-    // 不让 UI 去 `rec.best` 解引用一个非对象而把整局冻死。
-    return r && typeof r === 'object' && !Array.isArray(r) ? r : null;
+    // 不让 UI 去 `rec.best` 解引用一个非对象而把整局冻死。好记录里的坏字段由 tidy 逐字段重建。
+    return tidy(load().records[id]);
   },
 
   // Unlocking is monotone: replaying an early island chain must never hide a later one.
@@ -105,7 +120,7 @@ export const store = {
   // perfect flag.
   solve(id, { drags, target, hints }) {
     const s = load();
-    const prev = s.records[id];
+    const prev = tidy(s.records[id]);   // 脏 best（"abc"/1e99）不能参与"只降不升"的比较
     const cur = {
       solved: true,
       best: !prev || !prev.best || drags < prev.best ? drags : prev.best,

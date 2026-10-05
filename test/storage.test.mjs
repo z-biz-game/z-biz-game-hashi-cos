@@ -281,4 +281,54 @@ test('one window is not another: no state crosses a browser instance', () => {
     'nor did the other two, whose stores are separate module instances');
 });
 
+// 越界值是"坏档四样本"里最容易漏的一支：1e99 有限、非负、能 floor，但它不是成绩。
+const outRangeCase = await open({
+  raw: JSON.stringify({
+    unlocked: -99,
+    stats: { solves: -5, perfect: 1e99, drags: null, hints: 'zz' },
+    records: { 'shoal-01': { solved: true, best: 1e99, plays: -3, perfect: 1 } },
+  }),
+});
+// 四样垃圾各一条：null / 数字 / 字符串 / 数组，再加一条记录本身是对象但数值字段是脏的。
+const dirtyCase = await open({
+  raw: JSON.stringify({
+    unlocked: 3,
+    stats: { solves: 2 },
+    records: {
+      'shoal-01': null,
+      'shoal-02': 7,
+      'shoal-03': 'nope',
+      'shoal-04': [1, 2],
+      'shoal-05': { solved: true, best: 'abc' },
+      'shoal-06': { solved: true, best: 4, plays: 2, perfect: true },
+    },
+  }),
+});
+
+test('an out-of-range counter is refused rather than floored-and-kept', () => {
+  use(outRangeCase);
+  eq(outRangeCase.store.unlocked, 1, 'a negative unlock pointer is damage, not a level');
+  eq(outRangeCase.store.stats, { solves: 0, perfect: 0, drags: 0, hints: 0 }, 'and 1e99 solves is not a tally');
+  const r = outRangeCase.store.record('shoal-01');
+  eq([r.solved, r.best, r.plays], [true, 0, 0], 'the record survives; its impossible numbers go to default');
+  eq(outRangeCase.store.solve('shoal-01', { drags: 5, target: 5, hints: 0 }).best, 5,
+    'so a salvaged board can still record a real personal best');
+  outRangeCase.store.reset();
+});
+
+test('one bad record is dropped alone, and a dirty best cannot block a new one', () => {
+  use(dirtyCase);
+  const s = dirtyCase.store;
+  eq([s.record('shoal-01'), s.record('shoal-02'), s.record('shoal-03'), s.record('shoal-04')],
+    [null, null, null, null], 'null / number / string / array each lose only themselves');
+  eq(s.record('shoal-06'), { solved: true, best: 4, plays: 2, perfect: true }, 'the good record comes back whole');
+  eq(s.record('shoal-05').best, 0, 'a string best reads as "no personal best yet"');
+  eq(s.solve('shoal-05', { drags: 7, target: 7, hints: 0 }), { solved: true, best: 7, plays: 1, perfect: true },
+    'and the dirty value did not win the comparison');
+  eq(s.unlocked, 3, 'the rest of the save still decodes');
+  eq(Object.keys(s.records).length, 6, 'the raw map stays whole — the filtering happens on the read path');
+  eq(Object.values(s.records).filter((r) => r && typeof r === 'object' && !Array.isArray(r)).length, 2,
+    'two of the six are usable history');
+});
+
 run();
