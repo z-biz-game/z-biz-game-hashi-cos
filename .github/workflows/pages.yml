@@ -32,7 +32,7 @@ jobs:
           cp -r css js icons assets _site/
       - name: Verify every referenced path is in the artifact
         run: >
-          node -e "const fs=require('fs');const d='_site';const html=fs.readFileSync(d+'/index.html','utf8');const refs=new Set([...html.matchAll(/(?:href|src|content)=\"\.?\/?([^\"']+\.(?:png|css|js|webmanifest))\"/g)].map(m=>m[1]));for(const i of JSON.parse(fs.readFileSync(d+'/manifest.webmanifest','utf8')).icons)refs.add(i.src);for(const s of fs.readFileSync(d+'/sw.js','utf8').matchAll(/['](\.[^']*)[']|/g))if(s[1])refs.add(s[1]);const want=[...refs].map(r=>r.replace(/^\.?\//,''));const missing=want.filter(r=>!fs.existsSync(d+'/'+r)).sort();console.log('artifact refs',want.length,'missing',missing);process.exit(missing.length?1:0)"
+          node -e "const fs=require('fs');const d='_site';const html=fs.readFileSync(d+'/index.html','utf8');const refs=new Set([...html.matchAll(/(?:href|src|content)=\"\.?\/?([^\"']+\.(?:png|css|js|webmanifest))\"/g)].map(m=>m[1]));for(const i of JSON.parse(fs.readFileSync(d+'/manifest.webmanifest','utf8')).icons)refs.add(i.src);for(const s of fs.readFileSync(d+'/sw.js','utf8').matchAll(/['](\.[^']*)[']|/g))if(s[1])refs.add(s[1]);for(const f of ['view.js','main.js'])for(const s of fs.readFileSync(d+'/js/'+f,'utf8').matchAll(/['\"]((?:icons|assets)\/[^'\"]+\.png)['\"]/g))refs.add(s[1]);const want=[...refs].map(r=>r.replace(/^\.?\//,''));const missing=want.filter(r=>!fs.existsSync(d+'/'+r)).sort();console.log('artifact refs',want.length,'missing',missing);process.exit(missing.length?1:0)"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
