@@ -25,7 +25,9 @@ Hashiwokakero（桥梁）：海里散落着标了数字的岛，你在岛与岛�
   因为它有个后果：`完成一盘所需的最少拖拽数`恰好等于桥根数 `Σp/2`，每拖一次只可能加一根。
 * 被拒绝的拖拽**一次都不计**（不同行列、中间隔着第三座岛、会超过某座岛的数字、与已有桥交叉），
   所以屏上的"拖拽数"量的是玩法，不是手忙脚乱。
-* `撤销` `u` · `提示` `h` · `重开` `r` · `Esc` 收起结算卡。提示给的是**出厂那份唯一解**里还没架的
+* `撤销` `u` · `提示` `g` · `重开` `r` · `暂停` `p` · `静音` `m` · `全屏` `f` · `h`/`?` 帮助卡 ·
+  `Esc` 收起结算卡（处于暂停时先解除暂停）。暂停期间 `r`/`u`/`g` 和画布按下都**不吃**——
+  幕布盖着棋盘时键盘不能开后门（`main.js:451`）。提示给的是**出厂那份唯一解**里还没架的
   一根，跟着它不会走进死胡同，也不会把某座岛撑超数字。
 * 结算分三档：`一次到位`（拖拽数不超过 Σp/2 且没要提示）· `桥路通畅`（多花 ≤2 拖）· `绕了远路`。
 * 成绩只存在这台设备的浏览器里（一个 `localStorage` 键 `hashi.save.v1`），页底的
@@ -69,17 +71,21 @@ bash tools/verify.sh          # node 层 + 一次真实 headless Chrome 的 5 �
 ## 跑起来
 
 ```bash
-node server.cjs          # http://127.0.0.1:5181/ —— 零依赖静态服务器
+node server.cjs          # 默认 http://127.0.0.1:5180/ —— 零依赖静态服务器（`npm run dev` 与 verify.sh 用 :5181）
 npm run check            # node --check 全量（与 CI 的语法步骤同一文件集合）
 npm test                 # 语法 + 7 个 node 测试文件
 npm run balance          # 生成器的账，SEEDS=20 node test/balance.mjs 可加样本
 bash tools/verify.sh     # node 层 + 真实 Chrome（boot play routes save pointer）
 npm run bake             # 重新出题（会改写 js/data/lots.js，PER_TIER=12 可改每档数量）
+python3 assets/gen/make_art.py  # 重烤 12 张母题 PNG（要 Pillow；可复现性的 1/12 例外见「已知边界」）
 npm run electron         # 桌面壳
 ```
 
-零依赖、零打包器、零图片素材：`dependencies` 与 `devDependencies` 都是 `{}`，画面全部由
-canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不是支持的玩法。
+零依赖、零打包器：`dependencies` 与 `devDependencies` 都是 `{}`。画面主体由 canvas 2D 程序绘制，
+`assets/gen/make_art.py` 烤出的 12 张 PNG（`icons/` 的图标与社交卡、`assets/` 的海纹/岛屿/粒子）
+作为母题纹理叠在程序绘制之上；纹理加载失败（`onerror`：文件缺失/404）或环境里没有 `Image`
+时 `view.js` 的 `loadTex` 只把对应标志位留成 false，画面退回纯程序绘制而不是白屏。ES module
+需要 origin，所以双击 `index.html` 不是支持的玩法。
 
 路由：`#/c/12` 战役第 12 关 · `#/lot/shoal-03` 分享某一关 · `#/daily` 当日题 ·
 `#/random/archipelago/4kq2` 档位内随机。`#/daily` 用 `hashSeed(YYYY-MM-DD) % 32` 落在**固定题库**上，
@@ -89,6 +95,16 @@ canvas 2D 程序绘制。ES module 需要 origin，所以双击 `index.html` 不
 
 ## 已知边界（诚实清单）
 
+* **画布取子的命中区被格距卡死，不是所有盘面都能到 44px**。`view.js:140` 的 `islandAt()` 把命中
+  半径抬到 `max(radius()*1.4, min(22, cell*0.5))`：`6×6` 在 340px 画布（格距 49px、`radius()=14.7`）
+  实测最大可抓偏移 21px → **22px**，命中盒 42px → **44px 达标**；`7×7` 在 300px 画布（格距 36px）
+  只能拿到 `cell/2 = 18px`，盒 28px → **36px**，仍差 8px。再放大就越过半个格距，落在两座岛之间的
+  *海面*上的按下也会被最近的岛吃掉 —— 那是"点海面出岛"，比小盒子更糟。数字来自在沙箱里真发
+  `pointerdown/move/up` 序列、只看 `state.drags` 是否 +1 的 harness，横向与垂直各跑一遍。
+* **`assets/gen/make_art.py` 的重烤有 1/12 例外**。把字体加载桩成 `None` 重烤，12 张里 **11 张与
+  提交树逐字节相同**（`icons/` 与 `assets/` 的图都不含文字，噪声是固定种子）；唯一例外
+  `icons/og-1200x630.png` 的「数桥 HASHI」字样依赖 `CJK_FONT_CANDIDATES` 里的系统字体，一台都
+  找不到时退回圆角色块占位 —— 形状仍可读，但字节不同。所以社交卡**不是**跨机器可复现的资产。
 * **`k` 只在本仓内可比**。它定义在"本仓这 7 条规则 + 这个分支顺序 + 不用连通性做推理"之上；
   换一套更大的规则集（例如经典的"一组岛不能被切断"）同一批题会印出更小的数。`DESIGN.md` §4
   逐条列了规则表。
