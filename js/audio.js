@@ -50,7 +50,9 @@ function tone(freq, dur, type, peak) {
 
 export const audio = {
   // 首次用户手势里调用：把被自动挂起的上下文唤醒，之后才能正常出声。
+  // 静音态连上下文都不必拉起——手势策略只要求"有手势"，不要求"有节点"。
   unlock() {
+    if (muted) return;
     const c = ac();
     if (c && c.resume && c.state === 'suspended') c.resume();
   },
