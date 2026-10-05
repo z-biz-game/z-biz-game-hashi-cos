@@ -498,6 +498,10 @@ window.hashi = {
       motion: !(rmq && rmq.matches),
       help: !el.helpModal.hidden,
       particles: view.particleCount(),
+      // 定步长仿真的读数：帧率对拍要按步号对齐，而不是按墙钟虚拟秒（1000/60 的浮点亏损会少喂 5e-13 秒）。
+      simSteps: view.simInfo().steps,
+      simAccum: view.simInfo().accum,
+      simStep: view.simInfo().step,
       grid: view.gridSize(),
     };
   },

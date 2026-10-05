@@ -42,6 +42,11 @@ export function createView(canvas, { onBridge } = {}) {
   let shake = null; // { slot, until } — a refused drag, drawn as a short wobble
   let raf = 0;
   let last = 0;
+  // 定步长仿真：帧 dt 只进累加器，积分一律按 SIM_STEP 走。显式欧拉（先位移后加重力）在帧 dt 下
+  // 每帧少算半格冲量，30Hz 与 120Hz 跑同一虚拟时长会差出几十像素；粒子消亡时刻也会被帧网格量化。
+  const SIM_STEP = 1 / 120;
+  let accum = 0;
+  let simSteps = 0;
   let motion = true; // prefers-reduced-motion:false → 允许粒子/涟漪/抖动
   let paused = false;
   const particles = [];
@@ -476,20 +481,46 @@ export function createView(canvas, { onBridge } = {}) {
       last = now; // 暂停：只对齐时钟，仿真（粒子/涟漪/抖动计时）一律不推进
       return 0;
     }
-    const dtms = Math.min(64, now - (last || now));
+    if (!last) last = now; // 兜底：没有上一帧时间戳时不补算（start/恢复都已播种）
+    // 帧 dt 只进累加器（超过 50ms 的长帧被夹住：切回标签页不追帧）。这一行是帧率对拍的靶子。
+    const elapsed = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
-    const dt = Math.min(0.05, dtms / 1000);
+    accum += elapsed;
+    while (accum >= SIM_STEP - 1e-9) {
+      accum -= SIM_STEP;
+      simSteps += 1;
+      if (particles.length) stepParticles(SIM_STEP);
+    }
     if (hint && now >= hint.until) hint = null;
     if (shake && now >= shake.until) shake = null;
-    if (particles.length) stepParticles(dt);
     if (drag || hint || shake || particles.length) draw();
-    return dtms;
+    return elapsed;
   }
 
   canvas.addEventListener('pointerdown', down);
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', up);
+
+  // 回落：没有 PointerEvent 的环境（老 Safari、部分 WebView）里 touch/mouse 仍要能拖出桥。
+  // 坐标换算复用同一条 localPoint（getBoundingClientRect + clientX），所以手机缩放画布时
+  // 不会出现"点 A 打 B"。
+  if (typeof window === 'undefined' || typeof window.PointerEvent === 'undefined') {
+    const asPoint = (ev) => {
+      const t = (ev.touches && ev.touches[0]) || (ev.changedTouches && ev.changedTouches[0]) || ev;
+      return {
+        clientX: t.clientX, clientY: t.clientY, pointerId: 0,
+        preventDefault: () => { if (ev.preventDefault) ev.preventDefault(); },
+      };
+    };
+    canvas.addEventListener('touchstart', (ev) => down(asPoint(ev)), { passive: false });
+    canvas.addEventListener('touchmove', (ev) => move(asPoint(ev)), { passive: false });
+    canvas.addEventListener('touchend', (ev) => up(asPoint(ev)), { passive: false });
+    canvas.addEventListener('touchcancel', (ev) => up(asPoint(ev)), { passive: false });
+    canvas.addEventListener('mousedown', down);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', up);
+  }
 
   return {
     attach(next) {
@@ -498,6 +529,7 @@ export function createView(canvas, { onBridge } = {}) {
       hint = null;
       shake = null;
       particles.length = 0;
+      accum = 0; // 重开/换关：累加器余量不能带进新局
       measure();
     },
     measure,
@@ -531,7 +563,9 @@ export function createView(canvas, { onBridge } = {}) {
     },
     setPaused(v) {
       paused = !!v;
-      if (!paused) last = 0; // 恢复后不补算暂停期间的时长
+      // 恢复时把时钟播到"现在"：暂停期间那一段不补算，而恢复后到下一帧之间的真实时长要算，
+      // 否则丢掉的那一帧 dt 会随刷新率变化（30Hz 丢 33ms、120Hz 丢 8ms）——那是帧率依赖。
+      if (!paused) last = performance.now();
     },
     isPaused() { return paused; },
     setMotion(v) {
@@ -540,6 +574,8 @@ export function createView(canvas, { onBridge } = {}) {
       draw();
     },
     particleCount() { return particles.length; },
+    // 帧率对拍的读数口：步号是"仿真推进了多少"的唯一诚实单位（虚拟秒会被帧网格量化）。
+    simInfo() { return { steps: simSteps, accum, step: SIM_STEP, particles: particles.length }; },
     // 帧率对拍用的确定性钩子：同一批粒子分别按 30/60/120Hz 的步长喂 stepParticles，
     // 比较最终位置是否一致（dt 无关性）。
     testSpawn(n) { spawnParticles(n); },
@@ -547,7 +583,7 @@ export function createView(canvas, { onBridge } = {}) {
     testParticles() { return particles.map((p) => ({ x: p.x, y: p.y, life: p.life })); },
     start() {
       if (!raf) {
-        last = 0;
+        last = performance.now(); // 播种首帧：留 0 会让第一帧算出 dt=0，丢的时长随刷新率变
         raf = requestAnimationFrame(frame);
       }
     },
