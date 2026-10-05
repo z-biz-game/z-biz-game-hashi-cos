@@ -2,14 +2,18 @@
 """数桥 HASHI 的视觉母题工厂 —— 一条命令把全套位图资产烤进仓内。
 
 母题就是玩法本身：深海底 + 沙色岛屿节点 + 单/双平行桥。所有像素都在此程序化生成，
-不下载、不依赖外部图标库，因此在任何装有 Pillow 的机器上 `python3 assets/gen/make_art.py`
-都能逐字节复现（背景噪声用固定种子，不用 Math.random）。
+不下载、不依赖外部图标库，背景噪声用固定种子（不是 Math.random）。
+
+复现口径是实测过的，不是愿望：把 load_font / load_cjk_font 桩成 None 重烤，12 张里有
+11 张与提交树逐字节相同 —— icons/ 与 assets/ 的图都不含文字。唯一例外是
+og-1200x630.png，它的「数桥 HASHI」字样要用 FONT_CANDIDATES / CJK_FONT_CANDIDATES
+里的系统字体，一台都找不到时退回圆角色块占位，像素就不同（形状仍可读，但不是同一份字节）。
 
 产出（相对仓根）：
   icons/icon-1024.png        母图
   icons/icon-512.png         PWA / Android
   icons/icon-192.png         PWA
-  icons/icon-maskable-512.png PWA maskable（主体缩进 80% 安全区）
+  icons/icon-maskable-512.png / icon-maskable-192.png  PWA maskable（主体缩进 80% 安全区）
   icons/apple-touch-icon.png 180 iOS
   icons/favicon-32.png / favicon-16.png
   icons/og-1200x630.png      社交卡
@@ -17,7 +21,7 @@
   assets/island.png          游戏内岛屿 sprite（128，带留白容纳阴影）
   assets/particle.png        通关粒子贴图（64 柔光点）
 
-用法: python3 assets/gen/make_art.py [--only <子集>]
+用法: python3 assets/gen/make_art.py   # 一次烤全 12 张，产出路径打印到 stdout
 """
 import os
 import sys
