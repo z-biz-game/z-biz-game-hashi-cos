@@ -445,11 +445,13 @@ window.addEventListener('keydown', (ev) => {
     return;
   }
   if (k === 'p') togglePause();
+  else if (k === 'm') toggleMute();
+  else if (k === 'f') toggleFullscreen();
+  // 暂停期间棋盘输入不吃：幕布（z-index 30）本来就盖住了按钮，键盘不能开后门。
+  else if (app.paused) return;
   else if (k === 'r') restart();
   else if (k === 'u') el.undo.click();
   else if (k === 'g') el.hint.click();
-  else if (k === 'm') toggleMute();
-  else if (k === 'f') toggleFullscreen();
 });
 
 view.start();

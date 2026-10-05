@@ -2,9 +2,10 @@
 // about legality: on release it hands js/main.js a pair of island indices, and js/core/game.js
 // either applies the 0->1->2->0 cycle or refuses and asks for a shake.
 //
-// Everything is drawn procedurally — sea, islands, bridges — so the repo ships zero image assets.
-// A single bridge is one stroke; a double bridge is two strokes laid side by side, which is the
-// only convention in this file a player has to learn.
+// Everything is drawn procedurally — sea, islands, bridges — and the three baked textures from
+// assets/gen/make_art.py only lay on top: if they are missing or fail to decode, the board still
+// renders. A single bridge is one stroke; a double bridge is two strokes laid side by side, which
+// is the only convention in this file a player has to learn.
 //
 // The drag is the whole interaction: press an island, pull along its row or column, and the
 // target is the *nearest island on that ray*. That is what makes an over-drag harmless — pull
@@ -133,7 +134,10 @@ export function createView(canvas, { onBridge } = {}) {
 
   function islandAt(p) {
     if (!game) return -1;
-    const rr = radius() * 1.4;
+    // 命中半径抬到 22px（44px 盒），但不越过半个格距：越过之后落在两座岛之间的*海面*上
+    // 的按下也会被最近的岛吃掉，那是"点海面出岛"。所以取两者较小值 —— 密集盘面（7×7 在
+    // 300px 画布里格距只有 36px）能拿到的上限就是格距本身，再放大会吃掉邻岛。
+    const rr = Math.max(radius() * 1.4, Math.min(22, geom.cell * 0.5));
     let found = -1;
     let best = Infinity;
     game.comp.islands.forEach((x, i) => {
@@ -148,7 +152,7 @@ export function createView(canvas, { onBridge } = {}) {
   }
 
   function down(ev) {
-    if (!game || game.done) return;
+    if (!game || game.done || paused) return;
     const p = localPoint(ev);
     const from = islandAt(p);
     if (from < 0) return;
@@ -563,6 +567,8 @@ export function createView(canvas, { onBridge } = {}) {
     },
     setPaused(v) {
       paused = !!v;
+      // 暂停键可能在拖拽中途按下：那一拖直接作废，否则冻结的盘面上会留一条虚线预览。
+      if (paused && drag) { drag = null; draw(); }
       // 恢复时把时钟播到"现在"：暂停期间那一段不补算，而恢复后到下一帧之间的真实时长要算，
       // 否则丢掉的那一帧 dt 会随刷新率变化（30Hz 丢 33ms、120Hz 丢 8ms）——那是帧率依赖。
       if (!paused) last = performance.now();
