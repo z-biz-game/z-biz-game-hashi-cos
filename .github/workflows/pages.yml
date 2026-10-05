@@ -20,15 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # No bundler and no dependencies: the game ships plain ES modules, so the site is a
-      # file copy. Only these paths are reachable from index.html — keep the server, the
-      # electron shell, the bake tool and the tests out of the artifact. The shipped pool is
-      # js/data/lots.js (32 baked puzzles) and it is a source file like any other, so there is
-      # no generated asset to carry and no build step to run: the browser never generates.
+      # file copy. Keep the server, the electron shell, the bake tool and the tests out of the
+      # artifact — but the *art* does ship: index.html and manifest.webmanifest reference
+      # icons/*, the canvas loads assets/*.png (baked by assets/gen/make_art.py), and the PWA
+      # needs manifest + sw.js + sw-register.js. Dropping any of those is a 404 on the deployed
+      # site: no install prompt, no favicon, and the textures silently fall back to procedural.
       - name: Assemble static site
         run: |
           mkdir _site
-          cp index.html _site/
-          cp -r css js _site/
+          cp index.html manifest.webmanifest sw.js sw-register.js _site/
+          cp -r css js icons assets _site/
+      - name: Verify every referenced path is in the artifact
+        run: >
+          node -e "const fs=require('fs');const d='_site';const html=fs.readFileSync(d+'/index.html','utf8');const refs=new Set([...html.matchAll(/(?:href|src|content)=\"\.?\/?([^\"']+\.(?:png|css|js|webmanifest))\"/g)].map(m=>m[1]));for(const i of JSON.parse(fs.readFileSync(d+'/manifest.webmanifest','utf8')).icons)refs.add(i.src);for(const s of fs.readFileSync(d+'/sw.js','utf8').matchAll(/['](\.[^']*)[']|/g))if(s[1])refs.add(s[1]);const want=[...refs].map(r=>r.replace(/^\.?\//,''));const missing=want.filter(r=>!fs.existsSync(d+'/'+r)).sort();console.log('artifact refs',want.length,'missing',missing);process.exit(missing.length?1:0)"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
