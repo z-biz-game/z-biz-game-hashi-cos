@@ -486,7 +486,8 @@ export function createView(canvas, { onBridge } = {}) {
       return 0;
     }
     if (!last) last = now; // 兜底：没有上一帧时间戳时不补算（start/恢复都已播种）
-    // 帧 dt 只进累加器（超过 50ms 的长帧被夹住：切回标签页不追帧）。这一行是帧率对拍的靶子。
+    // 帧 dt 只进累加器（超过 50ms 的长帧被夹住：切回标签页不追帧）。这里必须吃真实 elapsed：
+    // 写成常量步长等于让仿真按帧数推进，120Hz 的机器会跑成 30Hz 的三倍速。
     const elapsed = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
     accum += elapsed;
