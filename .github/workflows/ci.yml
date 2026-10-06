@@ -29,7 +29,7 @@ jobs:
       - name: Syntax
         run: npm run check
       - name: Suites
-        run: for f in test/*.test.mjs; do echo "::group::$f"; node "$f"; echo "::endgroup::"; done
+        run: npm run unit
       # The difficulty leg, by the same command a human types locally. Until now the only thing
       # that ever ran `test/balance.mjs` at merge time was doctest's internal spawn (D5a asserts
       # its rc), so a workflow reading that never mentioned a balance step: the leg existed, but
