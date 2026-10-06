@@ -416,7 +416,7 @@ const ANCHORS = [
   ['js/core/make.js', '随机撒岛不行的论证', /A random scatter with a uniqueness filter/, 'make.js:15'],
   ['tools/verify.sh', 'CDP 默认号', /CDP_PORT=\$\{CDP_PORT/, 'tools/verify.sh:15-16'],
   ['tools/verify.sh', 'WEB 默认号', /WEB_PORT=\$\{WEB_PORT/, 'tools/verify.sh:15-16'],
-  ['tools/verify.sh', '端口被占就 exit 3', /exit 3/, 'verify.sh:101'],
+  ['tools/verify.sh', '端口被占就 exit 3', /exit 3/, 'verify.sh:105'],
   ['tools/playtest.mjs', 'isOurs 同源判定', /const isOurs = /, 'tools/playtest.mjs:21'],
   ['test/logic.test.mjs', '规则表里没有「全单桥」', /no rule claims/, 'test/logic.test.mjs:31'],
   ['test/logic.test.mjs', 'R-minned 到不了的论证', /R-minned is the one printed rule/, 'test/logic.test.mjs:124'],

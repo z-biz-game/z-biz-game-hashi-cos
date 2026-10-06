@@ -30,6 +30,13 @@ jobs:
         run: for f in js/*.js js/*/*.js server.cjs electron/main.cjs tools/*.mjs test/*.mjs; do node --check "$f"; done
       - name: Suites
         run: for f in test/*.test.mjs; do echo "::group::$f"; node "$f"; echo "::endgroup::"; done
+      # The difficulty leg, by the same command a human types locally. Until now the only thing
+      # that ever ran `test/balance.mjs` at merge time was doctest's internal spawn (D5a asserts
+      # its rc), so a workflow reading that never mentioned a balance step: the leg existed, but
+      # nothing at the merge gate named it. It costs 0.24s measured (4 tiers x 8 seeds), so the
+      # full default run is what CI gets.
+      - name: Balance (difficulty rig)
+        run: npm run balance
       # Two documentation-honesty gates, both pure logic (no browser): doctest re-derives every
       # number README/DESIGN prints from the engine or from balance and asserts equality; sabotage
       # then breaks one file at a time to prove each assertion group really goes RED and names the

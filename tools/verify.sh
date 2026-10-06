@@ -35,6 +35,10 @@ if [ -z "${SKIP_UNIT:-}" ]; then
     echo "--- $f"
     node "$f" || FAILED=1
   done
+  # 难度台架：与 ci.yml 的 Balance 步骤同一条命令。默认 4 档 × 8 种子，实测 0.24 秒，不开浏览器，
+  # 所以本地和 CI 都跑全量，不缩样本。
+  echo "=== balance ==="
+  npm run balance || FAILED=1
   # ------------------------------------------------------------------ documentation honesty gates
   # doctest re-derives every number README/DESIGN prints from the engine or from this repo's own
   # tools (a lying doc goes RED, and the doc gets fixed — never the assertion); sabotage then

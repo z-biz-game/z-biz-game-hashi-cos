@@ -182,4 +182,4 @@ node tools/bake.mjs       # 重新出题并改写 js/data/lots.js
 
 端口：web `:5181` / devtools `:9341`（`tools/verify.sh:15-16`）。驱动只 attach **同源**的 tab
 （`tools/playtest.mjs:21` 的 `isOurs`，origin 取自 BASE_URL），端口被占时 DevTools 绑不上就直接
-`exit 3`（`verify.sh:101`），而不是默默去驱动别人的页面 —— 否则一次"0 条浏览器断言"会被报成通过。
+`exit 3`（`verify.sh:105`），而不是默默去驱动别人的页面 —— 否则一次"0 条浏览器断言"会被报成通过。
