@@ -440,16 +440,28 @@ const resolve = (p) => {
   for (const d of ['tools/', 'js/core/', 'js/data/', 'js/', 'test/', 'css/', '.github/workflows/', '']) if (existsSync(join(ROOT, d + base))) return d + base;
   return null;
 };
-const bad = [];
-for (const c of cites) {
-  const rp = resolve(c[1]);
-  if (!rp) { bad.push(`${c[1]}:${c[2]}（文件不存在）`); continue; }
-  const n = read(rp).split('\n').length;
-  if (+c[2] > n || (+c[3] && +c[3] > n)) bad.push(`${c[1]}:${c[2]}${c[3] ? '-' + c[3] : ''}（该文件只有 ${n} 行）`);
-}
+// 一条引用能犯的错有三样：文件不在树里、行号越界、被指的行段整段是空行。第三样是这一轮补的：
+// 在中间插几行之后 `:NN` 指的是空行，可它还在界内，只问「行号存在吗」的那道闸一路绿。
+const citeMiss = (raw, fromRaw, toRaw) => {
+  const rp = resolve(raw);
+  if (!rp) return `${raw}:${fromRaw}（文件不存在）`;
+  const src = read(rp).split('\n');
+  const to = +(toRaw || fromRaw);
+  if (+fromRaw > src.length || to > src.length) return `${raw}:${fromRaw}${toRaw ? '-' + toRaw : ''}（该文件只有 ${src.length} 行）`;
+  if (src.slice(+fromRaw - 1, to).join('').trim() === '') return `${raw}:${fromRaw}${toRaw ? '-' + toRaw : ''} 那几行整段是空行`;
+  return '';
+};
+const bad = cites.map((c) => citeMiss(c[1], c[2], c[3])).filter(Boolean);
+// 空行这一道不许空转：靶子从本闸自己的文件里现量（写死行号会在有人填了那一行那天停止测试）。
+const ownLines = read('tools/doctest.mjs').split('\n');
+let blankAt = 0;
+for (let i = 1; i < ownLines.length; i++) if (String(ownLines[i]).trim() === '') { blankAt = i + 1; break; }
+const blankKnife = blankAt ? citeMiss('tools/doctest.mjs', blankAt, null) : '';
 ok(cites.length >= 22, `D11a 文档里的 path:NN 引用解析到 ${cites.length} 条（少于 22 条说明引用格式改了或被删空）`, `${cites.length} 条`);
-ok(bad.length === 0, `D11 每一条 path:NN 引用都落在真实文件的行数内（改了代码或插了行不重编就是这里红）`,
-  bad.length ? `越界：${bad.slice(0, 5).join('，')}${bad.length > 5 ? ` …共 ${bad.length} 条` : ''}` : `${cites.length} 条全部在范围内`);
+ok(bad.length === 0 && !!blankKnife, `D11 每一条 path:NN 引用都落在真实文件的行数内、且被指的那几行整段不许是空行（在界内不等于指到了代码；这一格自己带一把指向空行的刀）`,
+  bad.length ? `越界/不存在/空行：${bad.slice(0, 5).join('，')}${bad.length > 5 ? ` …共 ${bad.length} 条` : ''}`
+    : blankKnife ? `${cites.length} 条全部在范围内 · 刀：本闸第 ${blankAt} 行现量是空行，指过去判红「那几行整段是空行」`
+      : '本闸自己的文件里现量不出空行靶子 —— 空行那一道没被证明过');
 
 // ---- D12 复现命令与 npm test 的断言行数：七个文件、每个的 rows、合计，全部现跑 ----
 const suiteFiles = readdirSync(join(ROOT, 'test')).filter((f) => f.endsWith('.test.mjs')).sort();
