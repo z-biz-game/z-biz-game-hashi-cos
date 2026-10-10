@@ -12,7 +12,7 @@
 #   SKIP_UNIT=1 SCENARIOS="boot" ./tools/verify.sh   # browser only (what the CI browser job does)
 set -u
 HERE=$(cd "$(dirname "$0")/.." && pwd)
-CDP_PORT=${CDP_PORT:-9341}
+CDP_PORT=${CDP_PORT:-9341}; if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then echo ":$CDP_PORT is already LISTENING — a sibling gate or an orphan Chrome holds it; attaching there reads someone else's browser. Wait for it to finish, or rerun with CDP_PORT=<a free port>." >&2; lsof -nP -iTCP:"$CDP_PORT" -sTCP:LISTEN >&2 || true; exit 6; fi  # 一机一台：撞在同一个默认口上时不报错的是 Chrome，报错的是绿——先让路再开闸
 WEB_PORT=${WEB_PORT:-5181}
 BASE=${BASE_URL:-http://127.0.0.1:$WEB_PORT/}
 CHROME=${CHROME_BIN:-}
@@ -34,6 +34,36 @@ if [ -z "${SKIP_UNIT:-}" ]; then
   for f in test/*.test.mjs; do
     echo "--- $f"
     node "$f" || FAILED=1
+  done
+  # 难度台架：与 ci.yml 的 Balance 步骤同一条命令。默认 4 档 × 8 种子，实测 0.24 秒，不开浏览器，
+  # 所以本地和 CI 都跑全量，不缩样本。
+  echo "=== balance ==="
+  npm run balance || FAILED=1
+  # ------------------------------------------------------------------ documentation honesty gates
+  # doctest re-derives every number README/DESIGN prints from the engine or from this repo's own
+  # tools (a lying doc goes RED, and the doc gets fixed — never the assertion); sabotage then
+  # breaks one file at a time and proves each assertion group really does go RED and names the
+  # assertion it killed. Both are pure logic runs, so they belong here, before any browser exists.
+  # Their *own size* is pinned below as well as inside the gate: rc=0 alone cannot detect a gate
+  # that was narrowed by deleting 20 assertions, so a mismatched row/knife count is a failure too.
+  GATES="doctest sabotage"
+  DOCTEST_GROUPS_EXPECT=${DOCTEST_GROUPS_EXPECT:-17}
+  DOCTEST_ROWS_EXPECT=${DOCTEST_ROWS_EXPECT:-254}
+  SABOTAGE_KNIVES_EXPECT=${SABOTAGE_KNIVES_EXPECT:-16}
+  for g in $GATES; do
+    echo "=== $g ==="
+    OUT=$(node "tools/$g.mjs" 2>&1); RC=$?
+    printf '%s\n' "$OUT"
+    case "$g" in
+      doctest) PIN_WANT="pin: groups=$DOCTEST_GROUPS_EXPECT rows=$DOCTEST_ROWS_EXPECT" ;;
+      sabotage) PIN_WANT="pin: knives=$SABOTAGE_KNIVES_EXPECT" ;;
+    esac
+    PIN_GOT=$(printf '%s\n' "$OUT" | grep '^pin: ' | head -1)
+    if [ "$PIN_GOT" != "$PIN_WANT" ]; then
+      echo "$g 的规模与 verify.sh 的钉不符：got [$PIN_GOT] want [$PIN_WANT]" >&2
+      FAILED=1
+    fi
+    if [ $RC -ne 0 ]; then echo "$g rc=${RC}（红）" >&2; FAILED=1; fi
   done
   if [ $FAILED -ne 0 ]; then
     echo "=== node suites failed; browser not started ===" >&2
@@ -154,5 +184,10 @@ else
   echo "=== chrome exited, temp profile gone ==="
 fi
 rm -rf $UDD $TMP
+# 部署集闸：ci.yml 跑这两步、本地整闸以前一次都不跑。缺这一步就是「本地全绿、线上 404 自己的
+# manifest / sw.js / 图标」这一整类坏法。它不碰 Chrome，也不读页面，纯查产物。
+echo "=== deploy-set ==="
+node tools/deploy-set.mjs || FAILED=1
+node tools/deploy-set-selftest.mjs || FAILED=1
 [ $FAILED -eq 0 ] && echo "=== ALL GREEN ===" || echo "=== FAILURES ABOVE ==="
 exit $FAILED
