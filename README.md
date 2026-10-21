@@ -71,7 +71,7 @@ bash tools/verify.sh          # node 层 + 一次真实 headless Chrome 的 5 �
 ## 跑起来
 
 ```bash
-node server.cjs          # 默认 http://127.0.0.1:5180/ —— 零依赖静态服务器（`npm run dev` 与 verify.sh 用 :5181）
+node server.cjs          # 默认 http://127.0.0.1:5180/ —— 零依赖静态服务器（`npm run dev` 与 verify.sh 用 http://127.0.0.1:5181/）
 npm run check            # node --check 全量（与 CI 的语法步骤同一文件集合）
 npm test                 # 语法 + 7 个 node 测试文件
 npm run balance          # 生成器的账，SEEDS=20 node test/balance.mjs 可加样本

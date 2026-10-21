@@ -15,7 +15,9 @@ cd "$HERE" || exit 2
 [ -d "$DEST" ] || mkdir -p "$DEST" || { echo "cannot create $DEST" >&2; exit 2; }
 
 # 进站点的：玩家浏览器会去要的东西，一个都不落。
-cp index.html manifest.webmanifest sw.js "$DEST/"
+# sw-register.js 是仓根上那份旧注册脚本（页面实际加载的是 js/sw-register.js）——
+# 改用这份清单前，workflow 的内联 cp 把它一起拷进产物，这里保持产物内容不缩水。
+cp index.html manifest.webmanifest sw.js sw-register.js "$DEST/"
 cp -r css js "$DEST/"
 # 位图目录名不统一（icons/ 与 assets/ 都在用）：按存在与否收，缺的那个不是错误。
 for d in icons assets; do

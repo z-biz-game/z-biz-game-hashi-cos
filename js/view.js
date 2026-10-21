@@ -49,6 +49,10 @@ export function createView(canvas, { onBridge } = {}) {
   let accum = 0;
   let simSteps = 0;
   let motion = true; // prefers-reduced-motion:false → 允许粒子/涟漪/抖动
+  // 被拒的一拖会左右摆：off = Math.sin(now / 24) * 3 * 衰减，是一段纯装饰的来回位移。
+  // 减弱动效下**只把位移钉成 0，不动颜色**：那座桥此时正画成 WARN 橙，而 WARN 橙是
+  // "刚才这一拖不成立"唯一的画面证据；连它一起关掉，玩家就只剩一句读数，棋盘上却毫无异样。
+  // 与 ferry-cos 同口径：晃动是装饰，告警色是反馈。
   let paused = false;
   const particles = [];
 
@@ -67,13 +71,6 @@ export function createView(canvas, { onBridge } = {}) {
   loadTex('sea', 'assets/sea-tile.png', 'sea');
   loadTex('island', 'assets/island.png', 'island');
   loadTex('spark', 'assets/particle.png', 'spark');
-
-  // ---- 减弱动效（prefers-reduced-motion）----
-  // 被拒的一拖会左右摆：off = Math.sin(now / 24) * 3 * 衰减，是一段纯装饰的来回位移。
-  // 减弱动效下**只把位移钉成 0，不动颜色**：那座桥此时正画成 WARN 橙，而 WARN 橙是
-  // "刚才这一拖不成立"唯一的画面证据；连它一起关掉，玩家就只剩一句读数，棋盘上却毫无异样。
-  // 与 ferry-cos 同口径：晃动是装饰，告警色是反馈。
-  let reduceMotion = false;
 
   function measure() {
     const box = canvas.getBoundingClientRect();
@@ -534,17 +531,26 @@ export function createView(canvas, { onBridge } = {}) {
     canvas.addEventListener('mouseup', up);
   }
 
+  // 动效开关只有一个真相：motion = !reduceMotion。
+  // 并线两侧各留了一个标志（一边叫 motion、另一边叫 reduceMotion），后落进来的那个
+  // **在渲染里没人读** —— 置位了也不影响任何画面，等于一个假的开关。现在合成一个：
+  // setReduceMotion 是 setMotion 的另一种说法，两个名字都还能用。
+  function setMotion(v) {
+    motion = !!v;
+    if (!motion) particles.length = 0;
+    draw();
+    return motion;
+  }
+
   return {
     // The gate the runtime pref flip lands on: idempotent, and repaints so the bridge stops
     // mid-wobble on the same frame the setting changes rather than at the end of the shake.
     setReduceMotion(v) {
       const on = !!v;
-      if (on === reduceMotion) return reduceMotion;
-      reduceMotion = on;
-      if (reduceMotion) draw();
-      return reduceMotion;
+      if (on === !motion) return !motion;
+      return setMotion(!on);
     },
-    isReducedMotion: () => reduceMotion,
+    isReducedMotion: () => !motion,
     attach(next) {
       game = next;
       drag = null;
@@ -593,11 +599,7 @@ export function createView(canvas, { onBridge } = {}) {
     },
     isPaused() { return paused; },
     isMotion() { return motion; },
-    setMotion(v) {
-      motion = !!v;
-      if (!motion) particles.length = 0;
-      draw();
-    },
+    setMotion,
     particleCount() { return particles.length; },
     // 帧率对拍的读数口：步号是"仿真推进了多少"的唯一诚实单位（虚拟秒会被帧网格量化）。
     simInfo() { return { steps: simSteps, accum, step: SIM_STEP, particles: particles.length }; },

@@ -168,14 +168,14 @@ ocean: dropped — offBand:272 notUnique:149 noTree:33
 
 ```bash
 node server.cjs 5181      # http://127.0.0.1:5181/ ，零依赖静态服务器
-npm test                  # 语法检查 + 7 个 node 测试文件，共 101 行断言
+npm test                  # 语法检查 + 7 个 node 测试文件，共 103 行断言
 bash tools/verify.sh      # node 层 + 真实 headless Chrome：@boot @play @routes @save @pointer
 node test/balance.mjs     # §5 那张实测表（SEEDS=20 可加样本）
 node tools/bake.mjs       # 重新出题并改写 js/data/lots.js
 ```
 
 `npm test` 各文件的断言行数（`rows: N fail: 0`，本机 2026-09-27）：
-`count 15 · game 13 · library 9 · logic 18 · model 20 · rng 12 · storage 14`，合计 101。
+`count 15 · game 13 · library 9 · logic 18 · model 20 · rng 12 · storage 16`，合计 103。
 
 `bash tools/verify.sh` 的浏览器段（同一天，真实 headless Chrome + CDP）：
 `@boot 19 · @play 20 · @routes 13 · @save 12 · @pointer 20`，合计 84 行、0 失败、控制台无输出。
