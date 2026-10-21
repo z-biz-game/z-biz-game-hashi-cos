@@ -103,6 +103,47 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .totals { margin-left: 0; width: 100%; }
 }
 
+/* ---- 以下几组是「系统控件」那条线带进来的样式，并线时整块掉了 ----
+   掉的不只是好看不好看：.modal 少了 `position: fixed; inset: 0`，
+   玩法浮层就退化成文档流里的一块普通内容，铺在棋盘上把**所有指针输入**都吃掉
+   （真浏览器实测：按下的事件落在 #help-modal 上，棋盘一拖不动）。
+   .veil 同理：暂停幕布不遮屏，暂停就只是个摆设。
+   所以这几组是「能玩」的前提，必须在。 */
+
+/* 触摸命中区：把主控件都抬到 ≥44px（iOS HIG / WCAG 2.5.5）。
+   本文件末尾那条全局 `button, select, … { min-height: 44px !important }` 已经兜住了，
+   这条留着是它被摘掉时的兜底，不是重复声明。 */
+.modes button, .curtain-actions button, .shelf button { min-height: 44px; }
+.shelf button { display: inline-flex; align-items: center; justify-content: center; }
+
+/* 系统行：静音/暂停/全屏/玩法。engaged 态用沙色描边点亮。 */
+.controls.sys { margin-top: -6px; }
+.controls.sys button { color: var(--ink-dim); }
+.controls.sys button[aria-pressed="true"] { color: var(--sand); border-color: rgba(230, 201, 141, 0.6); background: rgba(230, 201, 141, 0.12); }
+
+/* 玩法说明浮层 */
+.modal { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: rgba(6, 10, 18, 0.78); backdrop-filter: blur(4px); }
+.modal[hidden] { display: none; }
+.modal-card { width: min(440px, 94%); border: 1px solid rgba(230, 201, 141, 0.35); border-radius: 16px; background: var(--bg-2); padding: 24px; color: var(--ink); }
+.modal-card h2 { font-size: 20px; margin-bottom: 12px; }
+.modal-card ol { margin: 0 0 12px 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.6; }
+.modal-card b { color: var(--sand); }
+.modal-card .keys { font-size: 12px; color: var(--ink-dim); line-height: 1.7; border-top: 1px solid var(--line); padding-top: 10px; }
+.modal-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
+.modal-actions button { min-height: 44px; padding: 10px 20px; border: 1px solid var(--line); border-radius: 10px; }
+.modal-actions .primary { border-color: rgba(230, 201, 141, 0.6); color: var(--sand); background: rgba(230, 201, 141, 0.1); }
+
+/* 暂停幕布 */
+.veil { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(6, 10, 18, 0.6); backdrop-filter: blur(2px); }
+.veil[hidden] { display: none; }
+.veil p { font-size: 28px; letter-spacing: 0.3em; color: var(--sand); }
+
+/* reduceMotion：关掉浮层/幕布的过渡与动效，标题退化为静图。 */
+@media (prefers-reduced-motion: reduce) {
+  .curtain-card, .modal-card, .toast { transition: none !important; animation: none !important; }
+  html { scroll-behavior: auto; }
+}
+
 /* 中央分发：safe-area 兜底 */
 
 /* ---------- safe-area：刘海与主屏条不吃掉按钮（中央分发，akari-cos 同口径） ---------- */

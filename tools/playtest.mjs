@@ -751,9 +751,12 @@ async function pointerScenario(cdp, sessionId, runJS) {
   await key('u');
   await sleep(150);
   rec('the u key undoes', (await state('window.hashi.state.drags')) === kMoves - 1, { before: kMoves, after: await state('window.hashi.state.drags') });
-  await key('h');
+  // 提示键是 `g`（README §玩法 的键位表：撤销 u · 提示 g · 重开 r · 暂停 p · 静音 m · 全屏 f ·
+  // h/? 帮助卡）。这条断言原来按的是 `h`，那是「系统控件」那条线把帮助卡接到 h/? 之前的旧键位，
+  // 键位表更新时这条断言没跟着改，于是它按的是一个会弹出玩法卡、根本不出提示的键。
+  await key('g');
   await sleep(150);
-  rec('the h key asks for a hint', (await state('window.hashi.state.hints')) === 1, await state('window.hashi.state.hints'));
+  rec('the g key asks for a hint', (await state('window.hashi.state.hints')) === 1, await state('window.hashi.state.hints'));
   await key('r');
   await sleep(150);
   rec('the r key restarts', (await state('window.hashi.state.drags')) === 0 && (await state('window.hashi.state.roots')) === 0, await state('window.hashi.state'));

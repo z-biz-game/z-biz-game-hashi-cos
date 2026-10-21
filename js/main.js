@@ -532,7 +532,14 @@ view.start();
 // must still be able to finish a puzzle.
 applyMotion();
 setMuted(!!prefs.muted);
-if (!prefs.seenHelp) openHelp();
+// 玩法浮层不再在首屏自动弹出。
+//
+// 原来这里有一句 `if (!prefs.seenHelp) openHelp();`：第一次访问自动盖一张玩法卡。
+// 但那张卡是 `position: fixed; inset: 0` 的整屏浮层，而 input 入口在
+// `commit()` 里被 `!el.helpModal.hidden` 挡住 —— 于是**第一次访问的玩家看不到棋盘**，
+// 自动引导反而把整局变成不可玩（真浏览器实测：按下的事件落在 #help-modal 上，棋盘一拖不动）。
+// 玩法卡本身一个没少：顶栏「玩法」按钮、`h`/`?` 键、Esc 收起都在（README §玩法 的键位表），
+// 去掉的只是「没看过就自动弹」这一个触发器。玩家想看随时按出来。
 apply();
 
 window.hashi = {
