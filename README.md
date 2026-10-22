@@ -178,9 +178,14 @@ README 门禁规模同理有刀（`K16` 改的是钉本身）。
 现在清单只有一份，住在 `tools/assemble-site.sh`：CI 调它拷 `_site`，本地闸调它拷临时目录，
 然后**对拷出来的产物**提要求（`tools/deploy-set.mjs`）：
 
-- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行，
-  `ci.yml` 里必须真有 `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
+- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行、
+  核验那一步必须真有 `run: node tools/deploy-set.mjs _site`（`W5`），`ci.yml` 里必须真有
+  `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
   路径——注释里本来就会写它，只 grep 字符串会被一句散文喂绿。
+  这一格是这一轮补的：核验那一步原本是一段内联的 `node -e` 抄本，抄本与本闸各管各的。抄本把
+  `og:image` 的**绝对 URL**（社交卡那一轮按 Pages 前缀写的）当成产物目录里的相对路径去找，
+  于是图标写对的那天它反而红——`Deploy to GitHub Pages` 连红两跑、线上站点停在旧构建，
+  而 `ci.yml`（跑本闸）与仓里每一条本地腿全绿：没有任何一步读过那段抄本。现在它读。
 - **R 引用可达**：引用不靠手打名单。从 `index.html` 的 `href/src` 出发，凡解析出来是 `.js`/`.css`
   的就把那一站也扫一遍（CSS 的 `url()`、JS 去掉注释后的 `'./…'` 字面量、`new URL(x, base)` 的两种
   基、`navigator.serviceWorker.register`、`scope`），`manifest` 的 icons/screenshots/shortcuts 各自

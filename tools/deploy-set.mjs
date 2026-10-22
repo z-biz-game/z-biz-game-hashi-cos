@@ -35,7 +35,7 @@ const EXPECT_CHECKS = 23;
 // 全绿时这个闸实际跑的断言条数（W/R/P 三段之和）。钉住它，「少一条断言」就不可能是绿的：
 // 删掉 manifest 里的一张图标会同时少一条 R10 与那张的 P1/P2 两行——那条路径缺文件本来就该红，
 // 但 rows 能漂就是闸在缩水的信号，所以两个数一起钉。
-const EXPECT_ROWS = 42;
+const EXPECT_ROWS = 43;
 
 let rows = 0;
 const fails = [];
@@ -56,6 +56,11 @@ ok(wf !== null, 'W1 workflow/pages.yml 读得到', wf === null ? '文件不存�
 if (wf !== null) {
   ok(ASSEMBLE_CALL.test(wf), 'W2 pages.yml 里真的调了 tools/assemble-site.sh',
     'pages.yml 没有 run: bash tools/assemble-site.sh <dir>：CI 拷的是另一份清单，本闸验的不是上线那份');
+  // 核验那一步也要认**调用行**：上一版它是一段内联抄的 node -e，抄本与本闸各自漂。抄本把
+  // og:image 的绝对 URL 当成产物目录里的相对路径去找，于是"图标写对了"那天它反而红——
+  // 上线部署连红两跑、站点停在旧构建，而 ci.yml 里调本闸的那一步照旧全绿（它不会去读抄本）。
+  ok(GATE_CALL.test(wf), 'W5 pages.yml 的产物核验调的就是本闸（run: node tools/deploy-set.mjs <产物目录>），不是一份内联抄本',
+    GATE_CALL.test(wf) ? '调用行在' : 'pages.yml 里没有 node tools/deploy-set.mjs 这一步：核验逻辑成了抄本，抄本会自己漂而没人看管');
 }
 const ci = readIf(path.join(ROOT, '.github/workflows/ci.yml'));
 ok(ci !== null, 'W3 workflow/ci.yml 读得到', ci === null ? '文件不存在' : '');

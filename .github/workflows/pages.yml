@@ -28,8 +28,10 @@ jobs:
       - name: Assemble static site
         run: bash tools/assemble-site.sh _site
       - name: Verify every referenced path is in the artifact
-        run: >
-          node -e "const fs=require('fs');const d='_site';const html=fs.readFileSync(d+'/index.html','utf8');const refs=new Set([...html.matchAll(/(?:href|src|content)=\"\.?\/?([^\"']+\.(?:png|css|js|webmanifest))\"/g)].map(m=>m[1]));for(const i of JSON.parse(fs.readFileSync(d+'/manifest.webmanifest','utf8')).icons)refs.add(i.src);for(const s of fs.readFileSync(d+'/sw.js','utf8').matchAll(/['](\.[^']*)[']|/g))if(s[1])refs.add(s[1]);for(const f of ['view.js','main.js'])for(const s of fs.readFileSync(d+'/js/'+f,'utf8').matchAll(/['\"]((?:icons|assets)\/[^'\"]+\.png)['\"]/g))refs.add(s[1]);const want=[...refs].map(r=>r.replace(/^\.?\//,''));const missing=want.filter(r=>!fs.existsSync(d+'/'+r)).sort();console.log('artifact refs',want.length,'missing',missing);process.exit(missing.length?1:0)"
+        # 这一格调的是仓里那一道闸（它同时也在 ci.yml 与 npm run deploy-set 里跑），不再抄一份内联的
+        # node -e。抄的那一份把 og:image 的**绝对 URL**当成产物目录里的相对路径去找，图标写对的那天它反而红：
+        # 上线的部署自此连红两跑，站点停在旧构建，而仓里每一条本地腿照旧全绿。闸认的是"调用这一行"（W5）。
+        run: node tools/deploy-set.mjs _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
