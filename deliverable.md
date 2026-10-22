@@ -1,6 +1,8 @@
 # deliverable — z-biz-game-hashi-cos
 
-基线 HEAD `04bdc0a`（并线后）→ 本次提交。所有数字都是本机现跑的输出，命令原样附在下面。
+基线 HEAD `04bdc0a`（并线后）→ 本次提交。下面那段是**这一次**原样贴出的输出（含真实浏览器那一遍）；
+其后的每一轮改动只把两腿的规模钉进闸自己（`tools/doctest.mjs` 的两颗钉、README 门禁清单那句规模、
+`tools/verify.sh` 的三条 expect），本报告不跟着漂——所以读到这里那一段不等于读现在的闸。
 
 ## 0. 一句话
 
@@ -84,7 +86,9 @@ canvas 的 `down()` 一次都没被调用。
   （页面实际加载的是 `js/sw-register.js`，仓根那份是旧副本）。
 - 部署集钉数 `EXPECT_CHECKS` 22→23、`EXPECT_ROWS` 41→42：并线新引入 1 条页面引用
   （`js/main.js` 的 `./audio.js`），逐条核过是真实存在、非 0 字节的文件，无引用丢失。
-- 文档数字对齐现场：DESIGN §7 的「共 101 行断言 / 合计 101」改成 103（storage 14→16）；
+- 文档数字对齐现场：DESIGN §7 那两处断言行数的写法，旧值改到新值 103（storage 14→16）——旧值故意不
+  写成「共 N 行断言」那道文法：`D12d` 把面里每一处这种文法都当成**现值**来对账，把历史数写进这种
+  文法里，要么红在一句历史上，要么绿着指隔壁，两种都是谎；
   README 的 dev/verify 端口写成 `http://127.0.0.1:5181/`，裸 `node server.cjs` 的默认 5180
   保持原样（那是 `server.cjs` 里的真值）。
 
@@ -140,9 +144,13 @@ rows: 42 fail: 0
 === ALL GREEN ===
 ```
 
-`verify.sh` 是本仓自己的整闸：node 套件 + 部署集闸 + 部署集自测 + doctest（254 项）
-+ sabotage（16 把刀）+ 真实浏览器（headless Chrome over CDP）五个场景 84 行断言 + console 干净
-+ 跑完无残留 Chrome。**ALL GREEN / rc=0**。改前是 13 条浏览器红 + 部署集 3 条红 + doctest 3 条红。
+`verify.sh` 是本仓自己的整闸：node 套件 + 部署集闸 + 部署集自测 + doctest
++ sabotage 台账 + 真实浏览器（headless Chrome over CDP）五个场景逐条断言 + console 干净
++ 跑完无残留 Chrome。**ALL GREEN / rc=0**。改前浏览器、部署集、doctest 三条腿各自有红项。
+两腿的规模是钉：doctest 的项数组名钉在自己的 `EXPECT_ROWS`/`EXPECT_GROUPS`，台账的刀数与文档抄的规模
+由 `tools/verify.sh` 的 `DOCTEST_ROWS_EXPECT`/`DOCTEST_GROUPS_EXPECT`/`SABOTAGE_KNIVES_EXPECT` 和 README
+门禁清单那一句共同对账（`D17b`、`D16b` 会把这几处逼成同一个数）。这一节因此不重抄它们——改了钉不回来改这里，
+读它就不等于读数。真实浏览器那五段的行数只有跑它的人才知道，本仓的规矩是别把它的数字抄进文档当现值。
 
 ## 8. 行为变化，需知会
 

@@ -48,8 +48,8 @@ if [ -z "${SKIP_UNIT:-}" ]; then
   # that was narrowed by deleting 20 assertions, so a mismatched row/knife count is a failure too.
   GATES="doctest sabotage"
   DOCTEST_GROUPS_EXPECT=${DOCTEST_GROUPS_EXPECT:-17}
-  DOCTEST_ROWS_EXPECT=${DOCTEST_ROWS_EXPECT:-254}
-  SABOTAGE_KNIVES_EXPECT=${SABOTAGE_KNIVES_EXPECT:-16}
+  DOCTEST_ROWS_EXPECT=${DOCTEST_ROWS_EXPECT:-255}
+  SABOTAGE_KNIVES_EXPECT=${SABOTAGE_KNIVES_EXPECT:-17}
   for g in $GATES; do
     echo "=== $g ==="
     OUT=$(node "tools/$g.mjs" 2>&1); RC=$?

@@ -56,7 +56,11 @@ const norm = (s) => s.replace(/`/g, '').replace(/\s+/g, '').replace(/×/g, 'x').
 
 const README = read('README.md');
 const DESIGN = read('DESIGN.md');
-const DOCS = README + '\n' + DESIGN;
+// 文档面按「仓根实际有哪几份 .md」现数，不按手写名单：上一版这里只拼 README+DESIGN，`deliverable.md`
+// 落进仓根之后它印的东西一概不进 D11 的输入——2026-10-22 的行为探针（往那份文档文末种一条坏引用、
+// 比 rc）实测：README 里的坏引用会红，deliverable.md 里的不会。这份名单是警报器（D11i 钉住它），
+// 不是"哪份文档值得读"的判断来源。
+const EXTRA_FACES = readdirSync(ROOT).filter((f) => f.endsWith('.md') && f !== 'README.md' && f !== 'DESIGN.md').sort(); const DOCS = [README, DESIGN, ...EXTRA_FACES.map(read)].join('\n');
 const CI = read('.github/workflows/ci.yml');
 const VERIFY = read('tools/verify.sh');
 const PKG = JSON.parse(read('package.json'));
@@ -432,7 +436,7 @@ for (const [file, what, re, cite] of ANCHORS) {
     ranges.length ? `文档 ${file} 的引用：${ranges.map(([a, b]) => (a === b ? String(a) : `${a}-${b}`)).join(' / ')} · 代码现在 ${real}` : '文档里解析不到这个文件的行引用');
 }
 
-// ---- D11 泛引用范围检查：README + DESIGN 里每一条 path:NN / path:NN-MM 都落在真实文件行数内 ----
+// ---- D11 泛引用范围检查：面里每一份文档（仓根现数，见文件头）的 path:NN / path:NN-MM 都落在真实文件行数内 ----
 const cites = [...DOCS.matchAll(/((?:\.github\/workflows\/|js\/|tools\/|css\/|test\/)?[\w./-]+\.(?:js|mjs|cjs|sh|json|html|yml)):(\d+)(?:-(\d+))?/g)];
 const resolve = (p) => {
   if (existsSync(join(ROOT, p))) return p;
@@ -462,6 +466,11 @@ ok(bad.length === 0 && !!blankKnife, `D11 每一条 path:NN 引用都落在真�
   bad.length ? `越界/不存在/空行：${bad.slice(0, 5).join('，')}${bad.length > 5 ? ` …共 ${bad.length} 条` : ''}`
     : blankKnife ? `${cites.length} 条全部在范围内 · 刀：本闸第 ${blankAt} 行现量是空行，指过去判红「那几行整段是空行」`
       : '本闸自己的文件里现量不出空行靶子 —— 空行那一道没被证明过');
+// D11 读几份文档不是它自己说了算：面从仓根现数（见文件头），而"现数出来的就是这两份"这件事必须有人钉。
+// 把面退回手写的 README+DESIGN，这一格当场红——它不检查任何引用，它检查的是"还有谁在读那份交付文档"。
+ok(EXTRA_FACES.length === 1 && EXTRA_FACES[0] === 'deliverable.md',
+  `D11i 仓根除 README/DESIGN 外正好一份交付文档，而且它在面里（多一份/少一份/退回手写名单都要红）`,
+  `${EXTRA_FACES.join(' ') || '（没有第三份）'} · 面里现数 ${cites.length} 条引用`);
 
 // ---- D12 复现命令与 npm test 的断言行数：七个文件、每个的 rows、合计，全部现跑 ----
 const suiteFiles = readdirSync(join(ROOT, 'test')).filter((f) => f.endsWith('.test.mjs')).sort();
@@ -553,14 +562,20 @@ ok(new Set(knifeGroups).size === knifeGroups.length && knifeGroups.every((g) => 
 
 // ---- D17 自数：这道闸自己发出的组数与项数都钉死 —— 删一条断言/少解析一行就是这里红 ----
 const EXPECT_GROUPS = 17;
-const EXPECT_ROWS = 254;
+const EXPECT_ROWS = 255;
+// README 门禁清单那一格抄的是「17 组 / 255 项等式」——它是**抄的**，而抄的数没人核对就会漂：
+// 加一条断言改了这里的钉、忘了改那一格，文档就印着一个上一轮的规模，而两处都绿。并进 D17b 这条
+// 自数里，是因为它俩必须是同一个事实：本闸发多少项，文档就得写多少项。
+const docScale = (README.match(/(\d+) 组 \/ (\d+) 项等式/) || []).slice(1).map(Number);
 // 求值顺序：ok() 的 label/detail 实参在本条计入 rows 之前就算好了，所以显式把「接下来要发的 D17a、D17b」
 // 与 D17 这一组预先并进总数再比 —— 钉的是全量运行的规模，不是运行到这里为止的规模。
 const finalRows = rows + (ONLY.length ? 0 : 2);
 const finalGroups = emitted.size + (emitted.has('D17') || ONLY.length ? 0 : 1);
 ok(finalGroups === EXPECT_GROUPS, `D17a 本闸发出 ${finalGroups} 组 D 标签（钉在 ${EXPECT_GROUPS}；少一组就是这里红）`,
   [...emitted].sort((a, b) => +a.slice(1) - +b.slice(1)).join(' '));
-ok(finalRows === EXPECT_ROWS, `D17b 本闸项数 == 钉的 ${EXPECT_ROWS}（增/删一条 ok() 都要改这里的钉）`, `本次累计 ${finalRows} 项${ONLY.length ? '（子集运行）' : ''}`);
+ok(finalRows === EXPECT_ROWS && docScale.length === 2 && docScale[0] === EXPECT_GROUPS && docScale[1] === EXPECT_ROWS,
+  `D17b 本闸项数 == 钉的 ${EXPECT_ROWS}，而且 README 门禁清单那句「${EXPECT_GROUPS} 组 / ${EXPECT_ROWS} 项」抄的是同一个钉（增/删一条 ok() 两处都要改）`,
+  `本次累计 ${finalRows} 项${ONLY.length ? '（子集运行）' : ''} · 文档 ${docScale.length === 2 ? `${docScale[0]} 组 / ${docScale[1]} 项` : '解析不到那句'}`);
 
 console.log(`\n合计 ${rows} 项，${fail.length} 项失败`);
 if (skipped.length) console.log(`NOTE 本次是子集运行（ONLY=${ONLY.join(',')}），未执行的组：${skipped.join(' ')}；自钉 D17 在全量运行才成立`);
