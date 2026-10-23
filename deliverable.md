@@ -131,9 +131,9 @@ rows: 42 fail: 0
 $ node tools/deploy-set-selftest.mjs
 DS_SELFTEST rc=0（0=每一刀都按预期发力、阴性对照按预期不发力）
 $ node tools/doctest.mjs
-合计 254 项，0 项失败
+合计 255 项，0 项失败
 $ bash tools/verify.sh
-knives: 16 fail: 0        （16 把刀各自逼红了点名的断言，复原逐字节一致，干净树对照双绿）
+knives: 17 fail: 0        （17 把刀各自逼红了点名的断言，复原逐字节一致，干净树对照双绿）
 === @boot ===    rows: 19 fail: []
 === @play ===    rows: 20 fail: []
 === @routes ===  rows: 13 fail: []
@@ -149,8 +149,10 @@ rows: 42 fail: 0
 + 跑完无残留 Chrome。**ALL GREEN / rc=0**。改前浏览器、部署集、doctest 三条腿各自有红项。
 两腿的规模是钉：doctest 的项数组名钉在自己的 `EXPECT_ROWS`/`EXPECT_GROUPS`，台账的刀数与文档抄的规模
 由 `tools/verify.sh` 的 `DOCTEST_ROWS_EXPECT`/`DOCTEST_GROUPS_EXPECT`/`SABOTAGE_KNIVES_EXPECT` 和 README
-门禁清单那一句共同对账（`D17b`、`D16b` 会把这几处逼成同一个数）。这一节因此不重抄它们——改了钉不回来改这里，
-读它就不等于读数。真实浏览器那五段的行数只有跑它的人才知道，本仓的规矩是别把它的数字抄进文档当现值。
+门禁清单那一句共同对账（`D17b`、`D16b` 会把这几处逼成同一个数）。上面 §7 那个日志块也抄了两个这种数
+（`合计 255 项，0 项失败`、`knives: 17`）——它们从这一轮起也在 `D17b`/`D16b` 的射程里：改了钉不回来改这里，
+这一格当场红，而不是让抄本停在上一轮。真实浏览器那五段的行数只有跑它的人才知道，本仓的规矩是别把它的
+数字抄进文档当现值。
 
 ## 8. 行为变化，需知会
 

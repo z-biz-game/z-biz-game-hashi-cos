@@ -548,9 +548,19 @@ const sabSrc = existsSync(join(ROOT, 'tools/sabotage.mjs')) ? read('tools/sabota
 // 多出来的一把刀 —— 而多出来的那一把没有真刀守着，D16b/D16d 就是在给一个幽灵记账。
 const knifeIds = [...sabSrc.matchAll(/^    id: '(K\d+)'/gm)].map((m) => m[1]);
 ok(knifeIds.length >= 4, `D16a sabotage.mjs 里至少 4 把刀（当前 ${knifeIds.length} 把：${knifeIds.join(' ')}）`, `${knifeIds.length} 把：${knifeIds.join(' ')}`);
-const knifeDoc = (README.match(/破坏试验台账（(\d+) 把刀）/) || [])[1];
-ok(!!knifeDoc && +knifeDoc === knifeIds.length, `D16b README 那句「台账（N 把刀）」等于 sabotage.mjs 里的刀数`,
-  `文档 ${knifeDoc ?? '未解析'} vs 脚本 ${knifeIds.length}`);
+// 刀数也是抄出去的数，有两种文法：散文里的「N 把刀」与 verify.sh 打印的「knives: N」（deliverable.md 的
+// 日志块整行抄走）。以前只核 README 那一句，deliverable.md 于是停在「knives: 16」「16 把刀」而脚本已经有
+// 17 把 —— 文档那句「D17b、D16b 会把这几处逼成同一个数」当时是句没有刀认的谎。现在逐面逐处对，
+// 解析到的处数还须 >= 3（把文法改到解析不出来，同样红在这里）。
+const knifeCopies = [];
+for (const f of ['README.md', 'DESIGN.md', ...EXTRA_FACES]) {
+  const t = read(f).replace(/\n\s*/g, ' ');
+  for (const m of t.matchAll(/([0-9]+|[一二两三四五六七八九十]+) ?把刀/g)) knifeCopies.push({ where: `${f} ${m[0]}`, n: CN[m[1]] !== undefined ? CN[m[1]] : Number(m[1]) });
+  for (const m of t.matchAll(/\bknives: (\d+)/g)) knifeCopies.push({ where: `${f} ${m[0]}`, n: +m[1] });
+}
+const badKnife = knifeCopies.filter((c) => c.n !== knifeIds.length);
+ok(knifeCopies.length >= 3 && badKnife.length === 0, `D16b 面里抄的刀数（散文「N 把刀」+ 打印的 knives: N，解析到 ${knifeCopies.length} 处）每一处都等于 sabotage.mjs 里的 ${knifeIds.length} 把`,
+  badKnife.length ? `不符：${badKnife.map((c) => `${c.where}=${c.n}`).join('，')}` : `脚本 ${knifeIds.length} 把 · ${knifeCopies.map((c) => `${c.where.slice(0, 24)}=${c.n}`).join(' · ')}`);
 const rcCells = knifeIds.map((id) => (sabSrc.match(new RegExp(`^    id: '${id}',[\\s\\S]*?rc: '(\\d+|\\?)'`, 'm')) || [])[1]);
 ok(rcCells.every((x) => x && /^\d+$/.test(x)), `D16c 台账每一格 rc 都是从闸里读回来的数字（'?' 表示这一版还没整跑过）`, rcCells.join(' / '));
 const knifeGroups = [...sabSrc.matchAll(/^    id: 'K\d+', group: '(D\d+)'/gm)].map((m) => m[1]);
@@ -566,16 +576,26 @@ const EXPECT_ROWS = 255;
 // README 门禁清单那一格抄的是「17 组 / 255 项等式」——它是**抄的**，而抄的数没人核对就会漂：
 // 加一条断言改了这里的钉、忘了改那一格，文档就印着一个上一轮的规模，而两处都绿。并进 D17b 这条
 // 自数里，是因为它俩必须是同一个事实：本闸发多少项，文档就得写多少项。
-const docScale = (README.match(/(\d+) 组 \/ (\d+) 项等式/) || []).slice(1).map(Number);
+// 而这一格的规模在面里其实有两种抄法：README 那句「N 组 / M 项」，和 deliverable.md 的日志块把闸打印的
+// 「合计 M 项，0 项失败」整行抄回去。以前只核 README 那一处，deliverable.md 于是停在「合计 254 项」而本闸
+// 已经发 255 项。现在逐面扫这两种文法：每一处都要等于钉的数，解析到的处数还须 >= 2（改文法让它解析不出来，
+// 同样红在这里）。
+const scaleCopies = [];
+for (const f of ['README.md', 'DESIGN.md', ...EXTRA_FACES]) {
+  const t = read(f).replace(/\n\s*/g, ' '); // 抄数会跨行折行：压平再对
+  for (const m of t.matchAll(/(\d+) 组 \/ (\d+) 项/g)) scaleCopies.push({ where: `${f} ${m[0]}`, g: +m[1], r: +m[2] });
+  for (const m of t.matchAll(/合计 (\d+) 项，0 项失败/g)) scaleCopies.push({ where: `${f} ${m[0]}`, g: EXPECT_GROUPS, r: +m[1] });
+}
+const badScale = scaleCopies.filter((c) => c.g !== EXPECT_GROUPS || c.r !== EXPECT_ROWS);
 // 求值顺序：ok() 的 label/detail 实参在本条计入 rows 之前就算好了，所以显式把「接下来要发的 D17a、D17b」
 // 与 D17 这一组预先并进总数再比 —— 钉的是全量运行的规模，不是运行到这里为止的规模。
 const finalRows = rows + (ONLY.length ? 0 : 2);
 const finalGroups = emitted.size + (emitted.has('D17') || ONLY.length ? 0 : 1);
 ok(finalGroups === EXPECT_GROUPS, `D17a 本闸发出 ${finalGroups} 组 D 标签（钉在 ${EXPECT_GROUPS}；少一组就是这里红）`,
   [...emitted].sort((a, b) => +a.slice(1) - +b.slice(1)).join(' '));
-ok(finalRows === EXPECT_ROWS && docScale.length === 2 && docScale[0] === EXPECT_GROUPS && docScale[1] === EXPECT_ROWS,
-  `D17b 本闸项数 == 钉的 ${EXPECT_ROWS}，而且 README 门禁清单那句「${EXPECT_GROUPS} 组 / ${EXPECT_ROWS} 项」抄的是同一个钉（增/删一条 ok() 两处都要改）`,
-  `本次累计 ${finalRows} 项${ONLY.length ? '（子集运行）' : ''} · 文档 ${docScale.length === 2 ? `${docScale[0]} 组 / ${docScale[1]} 项` : '解析不到那句'}`);
+ok(finalRows === EXPECT_ROWS && scaleCopies.length >= 2 && badScale.length === 0,
+  `D17b 本闸项数 == 钉的 ${EXPECT_ROWS}，而且面里抄的规模（「N 组 / M 项」与日志块「合计 M 项」，解析到 ${scaleCopies.length} 处）每一处都抄的是同一个钉（增/删一条 ok() 两处都要改）`,
+  `本次累计 ${finalRows} 项${ONLY.length ? '（子集运行）' : ''} · ${badScale.length ? `不符：${badScale.map((c) => `${c.where}=${c.g}/${c.r}`).join('，')}` : scaleCopies.map((c) => `${c.where.slice(0, 30)}=${c.g}/${c.r}`).join(' · ')}`);
 
 console.log(`\n合计 ${rows} 项，${fail.length} 项失败`);
 if (skipped.length) console.log(`NOTE 本次是子集运行（ONLY=${ONLY.join(',')}），未执行的组：${skipped.join(' ')}；自钉 D17 在全量运行才成立`);
