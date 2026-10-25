@@ -10,6 +10,9 @@ import {
 import { todayKey } from './core/rng.js';
 import { createView } from './view.js';
 import { audio } from './audio.js';
+// 触觉（003 §0 触觉一路）：语义分级件，档位只有三档 —— 轻 tap 8ms / 中 correct 26ms /
+// 重 wrong [14,40,14]。落子走 tap、引擎确认的推理走 correct、判错与过关走 wrong（最重档）。
+import { haptics } from './haptics.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -194,6 +197,7 @@ function commit(a, b) {
   if (!r.ok) {
     if (r.slot >= 0) view.shakeSlot(r.slot);
     audio.reject();
+    haptics.wrong();          // 玩家刚架了一座不成立的桥：引擎判它不成立
     view.redraw();
     renderCrumbs();
     const line = REJECT_LINE[r.reason] || '这一拖不成立';
@@ -202,6 +206,7 @@ function commit(a, b) {
   }
   if (r.action === 'clear') audio.clear();
   else audio.add();
+  haptics.tap();             // 玩家刚架起（或拆掉）一根桥：这一下真的落在盘上了
   renderCrumbs();
   if (g.done) finish();
   else {
@@ -231,6 +236,7 @@ function finish() {
   el.curtain.hidden = false;
   view.celebrate();
   audio.win();
+  haptics.wrong();           // 玩家刚把这盘数桥收完：过关是最重的一档
   render();
 }
 
@@ -302,6 +308,7 @@ el.hint.addEventListener('click', () => {
     return;
   }
   view.showHint(h);
+  haptics.correct();         // 玩家刚拿到一条引擎确认当下成立的推理：谜题推进对了
   say(`提示：在 <b>${h.a}↔${h.b}</b> 号岛之间架到 <b>${h.add}</b> 根 —— 还差 <b>${h.left}</b> 根`);
   renderCrumbs();
 });
